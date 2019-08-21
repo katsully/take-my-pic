@@ -212,7 +212,11 @@ while rval:
             color = (255, 0, 0)
 
         ## eyeglasses
-        landmarks = predictor(gray_image, face_coordinates)
+        print(type(face_coordinates))
+        print(face_coordinates)
+        x, y, w, h = face_coordinates
+        rect = dlib.rectangle(x,y,x+w,y+h)
+        landmarks = predictor(gray_image, rect)
         landmarks = landmarks_to_np(landmarks)
         LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(bgr_image, landmarks)
         aligned_face = get_aligned_face(gray_image, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
