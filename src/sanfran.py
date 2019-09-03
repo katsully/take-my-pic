@@ -29,7 +29,6 @@ def landmarks_to_np(landmarks, dtype="int"):
     return coords
 
 def get_centers(img, landmarks):
-    # 线性回归
     EYE_LEFT_OUTTER = landmarks[2]
     EYE_LEFT_INNER = landmarks[3]
     EYE_RIGHT_OUTTER = landmarks[0]
@@ -212,8 +211,6 @@ while rval:
             color = (255, 0, 0)
 
         ## eyeglasses
-        print(type(face_coordinates))
-        print(face_coordinates)
         x, y, w, h = face_coordinates
         rect = dlib.rectangle(x,y,x+w,y+h)
         landmarks = predictor(gray_image, rect)
