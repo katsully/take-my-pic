@@ -20,10 +20,12 @@ from pythonosc import udp_client
 
 import dlib
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # parameters for loading data and images
-detection_model_path = '../trained_models/detection_models/haarcascade_frontalface_default.xml'
-emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
+detection_model_path = '..\\trained_models\detection_models\haarcascade_frontalface_default.xml'
+emotion_model_path = r"..\trained_models\emotion_models\fer2013_mini_XCEPTION.102-0.66.hdf5"
 gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
 emotion_labels = get_labels('fer2013')
 gender_labels = get_labels('imdb')
@@ -52,15 +54,15 @@ gender_target_size = gender_classifier.input_shape[1:3]
 gender_window = []
 emotion_window = []
 
-client = udp_client.UDPClient("10.18.235.227", 8001)
+client = udp_client.UDPClient("127.0.0.1", 8001)
 
 # starting video streaming
 cv2.namedWindow('window_frame')
 video_capture = cv2.VideoCapture(0)
 if video_capture.isOpened(): # try to get the first frame
     rval, bgr_image = video_capture.read()
-    video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-    video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+    video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     width = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)   
     height = video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
     print(width)
