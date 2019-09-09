@@ -1,7 +1,7 @@
 import cv2
 from keras.models import load_model
 import numpy as np
-from threading import Timer
+import dlib
 from pythonosc import osc_server
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
@@ -13,6 +13,10 @@ from statistics import mode
 from utils.datasets import get_labels
 from utils.inference import apply_offsets
 from utils.preprocessor import preprocess_input
+from utils.glasses_helper import landmarks_to_np
+from utils.glasses_helper import get_centers
+from utils.glasses_helper import get_aligned_face
+from utils.glasses_helper import judge_eyeglass
 
 cam = cv2.VideoCapture(0)
 cam.set(3,640)	# width
@@ -23,6 +27,11 @@ gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
 emotion_labels = get_labels('fer2013')
 gender_labels = get_labels('imdb')
 
+# eyeglasses
+predictor_path = "../data/shape_predictor_5_face_landmarks.dat"
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor(predictor_path)
+
 # build udp_client for osc protocol
 client = udp_client.UDPClient("127.0.0.1", 8001)
 # counter for time with no faces
@@ -31,6 +40,7 @@ counter = 0
 avg_counter = 0
 emotion_text = []
 gender_text = []
+wearing_glasses = []
 
 # hyper-parameters for bounding boxes shape
 gender_offsets = (30, 60)
@@ -56,14 +66,14 @@ while(ret):
 	rotate = imutils.rotate_bound(img, 90)
 	flipped = cv2.flip(rotate, 1)
 	# convert image to grayscale
-	gray = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
+	gray_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
 	# convert from bgr to rgb
 	rgb_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2RGB)
 	# gray is the input grayscale image
 	# scaleFactor (optional) is specifying how much the image size is reduced at each image scale. It is used to create the scale pyramid
 	# minNeighbors (optional) is specifying how many neighbors each candidate rectangle show have, to retain it. A higher number gives lower false positives
 	# minSize (optional) is the minimum rectangle size to be considered a face
-	faces = face_detector.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=5)
+	faces = face_detector.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=5)
 	# if no faces are detected
 	# when faces are detected, the faces variable is an array of tuple, when no faces are detected the faces variable is an empty tuple
 	if isinstance(faces, tuple):
@@ -72,6 +82,7 @@ while(ret):
 		avg_counter = 0
 		emotion_text = []
 		gender_text = []
+		wearing_glasses = []
 		# only send message if no faces detected after 10 seconds
 		if(counter > 200):
 			msg = osc_message_builder.OscMessageBuilder(address="/noFace")
@@ -85,7 +96,7 @@ while(ret):
 		counter = 0
 		for (x,y,w,h) in faces: 
 			x1,x2,y1,y2 = apply_offsets((x,y,w,h), emotion_offsets)
-			gray_face = gray[y1:y2, x1:x2]
+			gray_face = gray_img[y1:y2, x1:x2]
 			x1,x2,y1,y2 = apply_offsets((x,y,w,h), gender_offsets)
 			rgb_face_og = rgb_img[y1:y2, x1:x2]
 			try:
@@ -107,6 +118,14 @@ while(ret):
 			gender_label_arg = np.argmax(gender_prediction)
 			gender_text.append(gender_labels[gender_label_arg])
 
+			# eyeglasses
+			rect = dlib.rectangle(x,y,x+w,y+h)
+			landmarks = predictor(gray_img, rect)
+			landmarks = landmarks_to_np(landmarks)
+			LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
+			aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
+			wearing_glasses.append(judge_eyeglass(aligned_face))
+
 			avg_counter += 1
 			print (avg_counter)
 
@@ -118,12 +137,15 @@ while(ret):
 				fileName = "../faces/face" + timestamp + ".jpg"
 				cv2.imwrite(fileName, rgb_face_og)
 				caption = mode(emotion_text) + " " + mode(gender_text)
+				if mode(wearing_glasses):
+					caption += " and is wearing glasses"
 				subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName, caption])
 				# exit the loop
 				ret = False
 				avg_counter = 0
 				emotion_text = []
 				gender_text = []
+				wearing_glasses = []
 
 	cv2.imshow('test window', flipped)
 	k = cv2.waitKey(30 & 0xff)
