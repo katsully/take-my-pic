@@ -8,6 +8,7 @@ from pythonosc import udp_client
 import subprocess
 import time
 import imutils
+from statistics import mode
 
 from utils.datasets import get_labels
 from utils.inference import apply_offsets
@@ -24,7 +25,12 @@ gender_labels = get_labels('imdb')
 
 # build udp_client for osc protocol
 client = udp_client.UDPClient("127.0.0.1", 8001)
+# counter for time with no faces
 counter = 0
+# counter for collecting the avg info about a person
+avg_counter = 0
+emotion_text = []
+gender_text = []
 
 # hyper-parameters for bounding boxes shape
 gender_offsets = (30, 60)
@@ -62,6 +68,10 @@ while(ret):
 	# when faces are detected, the faces variable is an array of tuple, when no faces are detected the faces variable is an empty tuple
 	if isinstance(faces, tuple):
 		counter+=1
+		# reset average face counter
+		avg_counter = 0
+		emotion_text = []
+		gender_text = []
 		# only send message if no faces detected after 10 seconds
 		if(counter > 200):
 			msg = osc_message_builder.OscMessageBuilder(address="/noFace")
@@ -73,14 +83,14 @@ while(ret):
 	else:
 		# reset noFaces timer
 		counter = 0
-		for (x,y,w,h) in faces:
+		for (x,y,w,h) in faces: 
 			x1,x2,y1,y2 = apply_offsets((x,y,w,h), emotion_offsets)
 			gray_face = gray[y1:y2, x1:x2]
 			x1,x2,y1,y2 = apply_offsets((x,y,w,h), gender_offsets)
-			rgb_face = rgb_img[y1:y2, x1:x2]
+			rgb_face_og = rgb_img[y1:y2, x1:x2]
 			try:
 				gray_face = cv2.resize(gray_face, (emotion_target_size))
-				rgb_face = cv2.resize(rgb_face, (gender_target_size))
+				rgb_face = cv2.resize(rgb_face_og, (gender_target_size))
 			except:
 				continue
 			# get emotion
@@ -88,24 +98,32 @@ while(ret):
 			gray_face = np.expand_dims(gray_face, 0)
 			gray_face = np.expand_dims(gray_face, -1)
 			emotion_label_arg = np.argmax(emotion_classifier.predict(gray_face))
-			emotion_text = emotion_labels[emotion_label_arg]
+			emotion_text.append(emotion_labels[emotion_label_arg])
 
 			# get gender
 			rgb_face = np.expand_dims(rgb_face, 0)
 			rgb_face = preprocess_input(rgb_face, False)
 			gender_prediction = gender_classifier.predict(rgb_face)
 			gender_label_arg = np.argmax(gender_prediction)
-			gender_text = gender_labels[gender_label_arg]
+			gender_text.append(gender_labels[gender_label_arg])
 
-			# get timestamp
-			ts = time.gmtime()
-			timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
-			fileName = "../faces/face" + timestamp + ".jpg"
-			cv2.imwrite(fileName, flipped[y:y+h, x:x+w])
-			caption = emotion_text + " " + gender_text
-			subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName, caption])
-			# exit the loop
-			ret = False
+			avg_counter += 1
+			print (avg_counter)
+
+			if avg_counter > 50:
+				print("HERE")
+				# get timestamp
+				ts = time.gmtime()
+				timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
+				fileName = "../faces/face" + timestamp + ".jpg"
+				cv2.imwrite(fileName, rgb_face_og)
+				caption = mode(emotion_text) + " " + mode(gender_text)
+				subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName, caption])
+				# exit the loop
+				ret = False
+				avg_counter = 0
+				emotion_text = []
+				gender_text = []
 
 	cv2.imshow('test window', flipped)
 	k = cv2.waitKey(30 & 0xff)
