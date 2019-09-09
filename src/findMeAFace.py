@@ -4,6 +4,7 @@ from pythonosc import osc_server
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
 import subprocess
+import time
 
 cam = cv2.VideoCapture(0)
 cam.set(3,640)	# width
@@ -44,8 +45,12 @@ while(ret):
 		# reset noFaces timer
 		counter = 0
 		for (x,y,w,h) in faces:
-			cv2.imwrite("../faces/face1.jpg", img[y:y+h, x:x+w])
-			subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat'])
+			# get timestamp
+			ts = time.gmtime()
+			timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
+			fileName = "../faces/face" + timestamp + ".jpg"
+			cv2.imwrite(fileName, img[y:y+h, x:x+w])
+			# subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat'])
 			# exit the loop
 			ret = False
 
