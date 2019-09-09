@@ -56,12 +56,12 @@ while(ret):
 
 			# get timestamp
 			ts = time.gmtime()
-			# timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
-			# fileName = "../faces/face" + timestamp + ".jpg"
-			# cv2.imwrite(fileName, img[y:y+h, x:x+w])
-			# subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName])
-			# # exit the loop
-			# ret = False
+			timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
+			fileName = "../faces/face" + timestamp + ".jpg"
+			cv2.imwrite(fileName, flipped[y:y+h, x:x+w])
+			subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName])
+			# exit the loop
+			ret = False
 
 	cv2.imshow('test window', flipped)
 	k = cv2.waitKey(30 & 0xff)
