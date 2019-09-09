@@ -1,1 +1,1 @@
-instapy -u lookingtogether -p lookyloo -f %~f1
+instapy -u lookingtogether -p lookyloo -f %~f1 -t %2
