@@ -5,6 +5,7 @@ from pythonosc import osc_message_builder
 from pythonosc import udp_client
 import subprocess
 import time
+import imutils
 
 cam = cv2.VideoCapture(0)
 cam.set(3,640)	# width
@@ -23,7 +24,11 @@ else:
 
 while(ret):
 	ret, img = cam.read()
-	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+	# flip camera 90 degrees
+	rotate = imutils.rotate_bound(img, 90)
+	flipped = cv2.flip(rotate, 1)
+	# convert image to grayscale
+	gray = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
 	# gray is the input grayscale image
 	# scaleFactor (optional) is specifying how much the image size is reduced at each image scale. It is used to create the scale pyramid
 	# minNeighbors (optional) is specifying how many neighbors each candidate rectangle show have, to retain it. A higher number gives lower false positives
@@ -45,16 +50,20 @@ while(ret):
 		# reset noFaces timer
 		counter = 0
 		for (x,y,w,h) in faces:
+			# get emotion
+			# emotion_label_arg = np.argmax(emotion_classifier.predict(gray_face))
+			# emotion_text = emotion_labels[emotion_label_arg]
+
 			# get timestamp
 			ts = time.gmtime()
-			timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
-			fileName = "../faces/face" + timestamp + ".jpg"
-			cv2.imwrite(fileName, img[y:y+h, x:x+w])
-			# subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat'])
-			# exit the loop
-			ret = False
+			# timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
+			# fileName = "../faces/face" + timestamp + ".jpg"
+			# cv2.imwrite(fileName, img[y:y+h, x:x+w])
+			# subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName])
+			# # exit the loop
+			# ret = False
 
-	cv2.imshow('image', img)
+	cv2.imshow('test window', flipped)
 	k = cv2.waitKey(30 & 0xff)
 	if k == 27: 	# press ESC to quit
 		break
