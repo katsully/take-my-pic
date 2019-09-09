@@ -43,7 +43,7 @@ while(ret):
 		# reset noFaces timer
 		counter = 0
 		for (x,y,w,h) in faces:
-			cv2.imwrite("../faces/face1.jpg", img)
+			cv2.imwrite("../faces/face1.jpg", img[y:y+h, x:x+w])
 			# exit the loop
 			ret = False
 
