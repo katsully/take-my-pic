@@ -15,7 +15,7 @@ from utils.preprocessor import preprocess_input
 import dlib
 
 def landmarks_to_np(landmarks, dtype="int"):
-    # 获取landmarks的数量
+    # landmarks
     num = landmarks.num_parts
     
     # initialize the list of (x, y)-coordinates
@@ -45,7 +45,7 @@ def get_centers(img, landmarks):
     RIGHT_EYE_CENTER =  np.array([np.int32(x_right), np.int32(x_right*k+b)])
     
     pts = np.vstack((LEFT_EYE_CENTER,RIGHT_EYE_CENTER))
-    cv2.polylines(img, [pts], False, (255,0,0), 1) #画回归线
+    cv2.polylines(img, [pts], False, (255,0,0), 1) 
     cv2.circle(img, (LEFT_EYE_CENTER[0],LEFT_EYE_CENTER[1]), 3, (0, 0, 255), -1)
     cv2.circle(img, (RIGHT_EYE_CENTER[0],RIGHT_EYE_CENTER[1]), 3, (0, 0, 255), -1)
     
@@ -56,13 +56,13 @@ def get_aligned_face(img, left, right):
     desired_h = 256
     desired_dist = desired_w * 0.5
     
-    eyescenter = ((left[0]+right[0])*0.5 , (left[1]+right[1])*0.5)# 眉心
+    eyescenter = ((left[0]+right[0])*0.5 , (left[1]+right[1])*0.5)
     dx = right[0] - left[0]
     dy = right[1] - left[1]
-    dist = np.sqrt(dx*dx + dy*dy)# 瞳距
-    scale = desired_dist / dist # 缩放比例
-    angle = np.degrees(np.arctan2(dy,dx)) # 旋转角度
-    M = cv2.getRotationMatrix2D(eyescenter,angle,scale)# 计算旋转矩阵
+    dist = np.sqrt(dx*dx + dy*dy)
+    scale = desired_dist / dist 
+    angle = np.degrees(np.arctan2(dy,dx)) 
+    M = cv2.getRotationMatrix2D(eyescenter,angle,scale)
 
     # update the translation component of the matrix
     tX = desired_w * 0.5
@@ -74,11 +74,6 @@ def get_aligned_face(img, left, right):
     
     return aligned_face
 
-#==============================================================================
-#   4.是否戴眼镜判别函数
-#       输入：对齐后的人脸图片
-#       输出：判别值(True/False)
-#============================================================================== 
 def judge_eyeglass(img):
     img = cv2.GaussianBlur(img, (11,11), 0) 
 
@@ -107,8 +102,8 @@ def judge_eyeglass(img):
     roi_2_2 = thresh[y_2:y_2+h_2, x_2_2:x_2_2+w_2]
     roi_2 = np.hstack([roi_2_1,roi_2_2])
     
-    measure_1 = sum(sum(roi_1/255)) / (np.shape(roi_1)[0] * np.shape(roi_1)[1])#计算评价值
-    measure_2 = sum(sum(roi_2/255)) / (np.shape(roi_2)[0] * np.shape(roi_2)[1])#计算评价值
+    measure_1 = sum(sum(roi_1/255)) / (np.shape(roi_1)[0] * np.shape(roi_1)[1])
+    measure_2 = sum(sum(roi_2/255)) / (np.shape(roi_2)[0] * np.shape(roi_2)[1])
     measure = measure_1*0.3 + measure_2*0.7
     
     cv2.imshow('roi_1',roi_1)
