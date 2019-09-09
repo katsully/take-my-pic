@@ -38,10 +38,14 @@ while(ret):
 			client.send(msg)
 			counter = 0
 
+	# camera found one or more faces
 	else:
+		# reset noFaces timer
 		counter = 0
-		for (x,y,w,h) in faces[0]:
-			print("hi")
+		for (x,y,w,h) in faces:
+			cv2.imwrite("../faces/face1.jpg", img)
+			# exit the loop
+			ret = False
 
 	cv2.imshow('image', img)
 	k = cv2.waitKey(30 & 0xff)
