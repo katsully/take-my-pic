@@ -74,25 +74,35 @@ while(ret):
 		# reset noFaces timer
 		counter = 0
 		for (x,y,w,h) in faces:
-			# get emotion
 			x1,x2,y1,y2 = apply_offsets((x,y,w,h), emotion_offsets)
 			gray_face = gray[y1:y2, x1:x2]
+			x1,x2,y1,y2 = apply_offsets((x,y,w,h), gender_offsets)
+			rgb_face = rgb_img[y1:y2, x1:x2]
 			try:
 				gray_face = cv2.resize(gray_face, (emotion_target_size))
+				rgb_face = cv2.resize(rgb_face, (gender_target_size))
 			except:
 				continue
+			# get emotion
 			gray_face = preprocess_input(gray_face, False)
 			gray_face = np.expand_dims(gray_face, 0)
 			gray_face = np.expand_dims(gray_face, -1)
 			emotion_label_arg = np.argmax(emotion_classifier.predict(gray_face))
 			emotion_text = emotion_labels[emotion_label_arg]
 
+			# get gender
+			rgb_face = np.expand_dims(rgb_face, 0)
+			rgb_face = preprocess_input(rgb_face, False)
+			gender_prediction = gender_classifier.predict(rgb_face)
+			gender_label_arg = np.argmax(gender_prediction)
+			gender_text = gender_labels[gender_label_arg]
+
 			# get timestamp
 			ts = time.gmtime()
 			timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
 			fileName = "../faces/face" + timestamp + ".jpg"
 			cv2.imwrite(fileName, flipped[y:y+h, x:x+w])
-			caption = emotion_text + " person"
+			caption = emotion_text + " " + gender_text
 			subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName, caption])
 			# exit the loop
 			ret = False
