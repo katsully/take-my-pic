@@ -3,6 +3,7 @@ from threading import Timer
 from pythonosc import osc_server
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
+import subprocess
 
 cam = cv2.VideoCapture(0)
 cam.set(3,640)	# width
@@ -44,6 +45,7 @@ while(ret):
 		counter = 0
 		for (x,y,w,h) in faces:
 			cv2.imwrite("../faces/face1.jpg", img[y:y+h, x:x+w])
+			subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat'])
 			# exit the loop
 			ret = False
 

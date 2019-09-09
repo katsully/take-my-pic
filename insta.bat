@@ -1,0 +1,1 @@
+instapy -u lookingtogether -p lookyloo -f C:/Users/NUC6-USER/take-my-pic/faces/face1.jpg
