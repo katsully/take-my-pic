@@ -24,7 +24,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # parameters for loading data and images
-detection_model_path = '..\\trained_models\detection_models\haarcascade_frontalface_default.xml'
+detection_model_path = '../trained_models/detection_models/haarcascade_frontalface_default.xml'
 emotion_model_path = r"..\trained_models\emotion_models\fer2013_mini_XCEPTION.102-0.66.hdf5"
 gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
 emotion_labels = get_labels('fer2013')
@@ -38,8 +38,8 @@ emotion_offsets = (20, 40)
 
 # loading models
 face_detection = load_detection_model(detection_model_path)
-emotion_classifier = load_model(emotion_model_path, compile=False)
-gender_classifier = load_model(gender_model_path, compile=False)
+# emotion_classifier = load_model(emotion_model_path, compile=False)
+# gender_classifier = load_model(gender_model_path, compile=False)
 
 # eyeglasses
 predictor_path = "../data/shape_predictor_5_face_landmarks.dat"
@@ -47,14 +47,14 @@ detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(predictor_path)
 
 # getting input model shapes for inference
-emotion_target_size = emotion_classifier.input_shape[1:3]
-gender_target_size = gender_classifier.input_shape[1:3]
+# emotion_target_size = emotion_classifier.input_shape[1:3]
+# gender_target_size = gender_classifier.input_shape[1:3]
 
 # starting lists for calculating modes
 gender_window = []
 emotion_window = []
 
-client = udp_client.UDPClient("127.0.0.1", 8001)
+client = udp_client.UDPClient("10.18.235.227", 8001)
 
 # starting video streaming
 cv2.namedWindow('window_frame')

@@ -42,17 +42,21 @@ detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(predictor_path)
 
 # build udp_client for osc protocol
-client = udp_client.UDPClient("127.0.0.1", 8001)
+client = udp_client.UDPClient("", 8001)
 # counter for time with no faces
-counter = 0
+noface_counter = 0
 # counter for collecting the avg info about a person
-avg_counter = face_counter = 0
+avg_counter = 0
+face_counter = 0
 emotion_text = []
 # gender_text = []
 wearing_glasses = []
 shirt_color = []
 found_face = True;
-face_x = face_y = face_w = face_h = 0
+face_x = 0
+face_y = 0
+face_w = 0
+face_h = 0
 face_analyze = False
 
 # hyper-parameters for bounding boxes shape
@@ -73,6 +77,7 @@ client = udp_client.UDPClient("10.18.235.227", 8001)
 
 if cam.isOpened(): # try to get the first frame
 	ret, img = cam.read()
+	print("width ", cam.get(cv2.CAP_PROP_FRAME_WIDTH))
 else:
     ret = False
 
@@ -93,7 +98,7 @@ while(ret):
 	# if no faces are detected
 	# when faces are detected, the faces variable is an array of tuple, when no faces are detected the faces variable is an empty tuple
 	if isinstance(faces, tuple):
-		counter+=1
+		noface_counter+=1
 		found_face = False
 		face_analyze = False
 		face_counter = 0
@@ -104,16 +109,16 @@ while(ret):
 		wearing_glasses.clear()
 		shirt_color.clear()
 		# only send message if no faces detected after 10 seconds
-		if(counter > 200):
+		if(noface_counter > 200):
 			msg = osc_message_builder.OscMessageBuilder(address="/noFace")
 			msg = msg.build()
 			client.send(msg)
-			counter = 0
+			noface_counter = 0
 
 	# camera found one or more faces
 	else:
 		# reset noFaces timer
-		counter = 0
+		noface_counter = 0
 		# focusing on a single face
 		if found_face:
 			x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), crop_offsets)
@@ -143,8 +148,10 @@ while(ret):
 				inner_eye = landmarks[3]
 				cv2.circle(img, (inner_eye[0], inner_eye[1]), 20, 100)
 				msg = osc_message_builder.OscMessageBuilder(address="/lookAt")
-				xPos = inner_eye[0]/width
-				yPos = inner_eye[1]/height
+				# print("xPos ", inner_eye[0])
+
+				xPos = inner_eye[0]/cam.get(cv2.CAP_PROP_FRAME_WIDTH)
+				yPos = inner_eye[1]/cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
 				msg.add_arg(xPos)
 				msg.add_arg(yPos)
 				msg = msg.build()
@@ -196,40 +203,34 @@ while(ret):
 					s_h = face_h + int(face_h * 1.25)
 					shirt_region = rgb_img[s_y:s_y+s_h, x1:x2]
 
+					if type(shirt_region) is not 'NoneType':
+						shirt_image = Image.fromarray(shirt_region, 'RGB')
+						hist = shirt_image.histogram()
+						# split into red, green, blue
+						r = hist[0:256]
+						g = hist[256:256*2]
+						b = hist[256*2: 256*3]
 
-					shirt_image = Image.fromarray(shirt_region, 'RGB')
-					hist = shirt_image.histogram()
-					# split into red, green, blue
-					r = hist[0:256]
-					g = hist[256:256*2]
-					b = hist[256*2: 256*3]
+						# perform the weighted average of each channel
+						# the *index* is the channel value, and the *value* is its weight
+						avg_r = sum( i*w for i, w in enumerate(r) ) / sum(r)
+						avg_g = sum( i*w for i, w in enumerate(g) ) / sum(g)
+						avg_b = sum( i*w for i, w in enumerate(b) ) / sum(b)
 
-					# perform the weighted average of each channel
-					# the *index* is the channel value, and the *value* is its weight
+						avg_h, avg_s, avg_v = rgb_to_hsv(avg_r, avg_g, avg_b)
+						# print("rgb", avg_r, avg_g, avg_b)
+						# up the saturation
+						avg_s += .12
+						avg_v += avg_v * 1.75
 
-					avg_r = sum( i*w for i, w in enumerate(r) ) / sum(r)
-					avg_g = sum( i*w for i, w in enumerate(g) ) / sum(g)
-					avg_b = sum( i*w for i, w in enumerate(b) ) / sum(b)
-
-					avg_h, avg_s, avg_v = rgb_to_hsv(avg_r, avg_g, avg_b)
-					# print("rgb", avg_r, avg_g, avg_b)
-					# up the saturation
-					avg_s += .12
-					avg_v += avg_v * 1.75
-
-					new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
-
-					# print("new averages", new_r, new_g, new_b)
-
-					# cv2.imshow('color window', shirt_region)
-					# b, g, r = np.mean(shirt_region, axis=(0,1))
-					# print(b,g,r)
-					cv2.rectangle(img,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
-					# actual_name, closest_name = get_color_name( (int(new_r),int(new_g),int(new_b)) )
-					color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
-					# magik_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
-					# print(color_name)
-					shirt_color.append(color_name)
+						new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
+						# print("new averages", new_r, new_g, new_b)
+						cv2.rectangle(img,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
+						# actual_name, closest_name = get_color_name( (int(new_r),int(new_g),int(new_b)) )
+						color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
+						# magik_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
+						# print(color_name)
+						shirt_color.append(color_name)
 
 					if avg_counter > 50:
 						msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
@@ -243,9 +244,9 @@ while(ret):
 						caption = max(set(emotion_text), key=emotion_text.count) + " person wearing a " + max(set(shirt_color), key=shirt_color.count) + " top" #+ max(set(gender_text), key=gender_text.count)
 						if max(set(wearing_glasses), key=wearing_glasses.count):
 							caption += " and is wearing glasses"
-						subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName, caption])
+						# subprocess.call(['../insta.bat', fileName, caption])
 						# exit the loop
-						ret = False
+						# ret = False
 						# Reset everything
 						avg_counter = 0
 						emotion_text.clear()

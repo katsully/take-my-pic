@@ -12,3 +12,4 @@ pandas
 matplotlib
 h5py
 instapy-cli
+webcolors
