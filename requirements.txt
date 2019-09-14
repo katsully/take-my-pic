@@ -11,3 +11,4 @@ python-osc
 pandas
 matplotlib
 h5py
+instapy-cli
