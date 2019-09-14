@@ -7,7 +7,9 @@ from pythonosc import osc_message_builder
 from pythonosc import udp_client
 import subprocess
 import time
+from imutils import face_utils
 import imutils
+import random
 
 from utils.datasets import get_labels
 from utils.inference import apply_offsets
@@ -26,6 +28,8 @@ from PIL import Image
 cam = cv2.VideoCapture(0)
 cam.set(3,960)	# width
 cam.set(4,720)  # height
+width = 960
+height = 720
 face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
 emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
 # gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
@@ -63,7 +67,8 @@ emotion_classifier = load_model(emotion_model_path, compile=False)
 emotion_target_size = emotion_classifier.input_shape[1:3]
 # gender_target_size = gender_classifier.input_shape[1:3]
 
-
+# OSC
+client = udp_client.UDPClient("10.18.235.227", 8001)
 
 
 if cam.isOpened(): # try to get the first frame
@@ -74,12 +79,12 @@ else:
 while(ret):
 	ret, img = cam.read()
 	# flip camera 90 degrees
-	rotate = imutils.rotate_bound(img, 90)
-	flipped = cv2.flip(rotate, 1)
+	# rotate = imutils.rotate_bound(img, 90)
+	# flipped = cv2.flip(rotate, 1)
 	# convert image to grayscale
-	gray_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
+	gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 	# convert from bgr to rgb
-	rgb_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2RGB)
+	rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 	# gray is the input grayscale image
 	# scaleFactor (optional) is specifying how much the image size is reduced at each image scale. It is used to create the scale pyramid
 	# minNeighbors (optional) is specifying how many neighbors each candidate rectangle show have, to retain it. A higher number gives lower false positives
@@ -117,11 +122,33 @@ while(ret):
 			faces = face_detector.detectMultiScale(cropped_img, scaleFactor=1.3, minNeighbors=5)
 			# is the face gone?
 			if isinstance(faces, tuple):
+				# tell matt we lost the face after a significant amount of tracking
+				if face_analyze:
+					msg = osc_message_builder.OscMessageBuilder(address="/lostFace")
+					msg = msg.build()
+					client.send(msg)
 				found_face = False
 				face_counter = 0
-				print("lost your face!")
+				face_analyze = False
+				emotion_text.clear()
+				shirt_color.clear()
+				wearing_glasses.clear()
+				# print("lost your face!")
 			# face is still there
 			else:
+				# send coordinates to max so avatar looks at face
+				rect = dlib.rectangle(x,y,x+w,y+h)
+				landmarks = predictor(gray_img, rect)
+				landmarks = landmarks_to_np(landmarks)
+				inner_eye = landmarks[3]
+				cv2.circle(img, (inner_eye[0], inner_eye[1]), 20, 100)
+				msg = osc_message_builder.OscMessageBuilder(address="/lookAt")
+				xPos = inner_eye[0]/width
+				yPos = inner_eye[1]/height
+				msg.add_arg(xPos)
+				msg.add_arg(yPos)
+				msg = msg.build()
+				client.send(msg)
 				# if we're still determining this face isn't someone quickly entering and exiting
 				if not face_analyze:
 					face_counter += 1
@@ -158,7 +185,7 @@ while(ret):
 					rect = dlib.rectangle(x,y,x+w,y+h)
 					landmarks = predictor(gray_img, rect)
 					landmarks = landmarks_to_np(landmarks)
-					LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
+					LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(img, landmarks)
 					aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
 					wearing_glasses.append(judge_eyeglass(aligned_face))
 
@@ -168,6 +195,7 @@ while(ret):
 					s_y = face_y + int(face_h * 1.65)
 					s_h = face_h + int(face_h * 1.25)
 					shirt_region = rgb_img[s_y:s_y+s_h, x1:x2]
+
 
 					shirt_image = Image.fromarray(shirt_region, 'RGB')
 					hist = shirt_image.histogram()
@@ -184,27 +212,29 @@ while(ret):
 					avg_b = sum( i*w for i, w in enumerate(b) ) / sum(b)
 
 					avg_h, avg_s, avg_v = rgb_to_hsv(avg_r, avg_g, avg_b)
-					print("rgb", avg_r, avg_g, avg_b)
+					# print("rgb", avg_r, avg_g, avg_b)
 					# up the saturation
 					avg_s += .12
 					avg_v += avg_v * 1.75
 
 					new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
 
-					print("new averages", new_r, new_g, new_b)
+					# print("new averages", new_r, new_g, new_b)
 
-					cv2.imshow('color window', shirt_region)
+					# cv2.imshow('color window', shirt_region)
 					# b, g, r = np.mean(shirt_region, axis=(0,1))
 					# print(b,g,r)
-					cv2.rectangle(flipped,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
+					cv2.rectangle(img,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
 					# actual_name, closest_name = get_color_name( (int(new_r),int(new_g),int(new_b)) )
 					color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
 					# magik_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
-					print(color_name)
+					# print(color_name)
 					shirt_color.append(color_name)
 
 					if avg_counter > 50:
-						print("send face to instaaaaa")
+						msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
+						msg = msg.build()
+						client.send(msg)
 						# get timestamp
 						ts = time.gmtime()
 						timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
@@ -222,14 +252,16 @@ while(ret):
 						# gender_text.clear()
 						wearing_glasses.clear()
 						shirt_color.clear()
-						found_face = face_analyze = False
+						found_face = False
+						face_analyze = False
 						face_counter = 0
 				
 		# still looking for a face to focus on
 		else:	
+			shuffle_faces = random.shuffle(faces)
 			for (x,y,w,h) in faces: 
 				# we found a face!
-				print("found a face")
+				# print("found a face")
 				found_face = True;
 				face_x, face_y, face_w, face_h = x,y,w,h
 				break
@@ -295,11 +327,11 @@ while(ret):
 				# 	wearing_glasses = []
 				# 	shirt_color = []
 
-	cv2.imshow('test window', flipped)
+	cv2.imshow('test window', img)
 	k = cv2.waitKey(30 & 0xff)
 	if k == 27: 	# press ESC to quit
 		break
  
-# end of program
-cam.release()
-cv2.destroyAllWindows()
+# # end of program
+# cam.release()
+# cv2.destroyAllWindows()

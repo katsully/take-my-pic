@@ -84,7 +84,7 @@ while rval:
 
         top_of_nose = shape[3]
         # print(top_of_nose)
-        # cv2.circle(rgb_image, (top_of_nose[0], top_of_nose[1]), 20, 100)
+        cv2.circle(rgb_image, (top_of_nose[0], top_of_nose[1]), 20, 100)
         msg = osc_message_builder.OscMessageBuilder(address="/LookAt")
         xPos = top_of_nose[0]/width
         yPos = top_of_nose[1]/height
@@ -93,9 +93,9 @@ while rval:
         msg = msg.build()
         client.send(msg)
 
-#     bgr_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
-#     cv2.imshow('window_frame', bgr_image)
-#     if cv2.waitKey(1) & 0xFF == ord('q'):
-#         break
-# video_capture.release()
-# cv2.destroyAllWindows()
+    bgr_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
+    cv2.imshow('window_frame', bgr_image)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+video_capture.release()
+cv2.destroyAllWindows()
