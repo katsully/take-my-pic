@@ -58,6 +58,9 @@ face_y = 0
 face_w = 0
 face_h = 0
 face_analyze = False
+face_looking = False
+face_loop = 0
+find_face_mode = False
 
 # hyper-parameters for bounding boxes shape
 crop_offsets = (50, 70)
@@ -65,14 +68,26 @@ emotion_offsets = (20, 40)
 
 # loading models
 emotion_classifier = load_model(emotion_model_path, compile=False)
-# gender_classifier = load_model(gender_model_path, compile=False)
 
 # getting input model shapes for inference
 emotion_target_size = emotion_classifier.input_shape[1:3]
-# gender_target_size = gender_classifier.input_shape[1:3]
 
 # OSC
 client = udp_client.UDPClient("10.18.235.227", 8001)
+
+def sendCoords(x,y,w,h, gray_img):
+	rect = dlib.rectangle(x,y,x+w,y+h)
+	landmarks = predictor(gray_img, rect)
+	landmarks = landmarks_to_np(landmarks)
+	inner_eye = landmarks[3]
+	cv2.circle(img, (inner_eye[0], inner_eye[1]), 20, 100)
+	msg = osc_message_builder.OscMessageBuilder(address="/lookAt")
+	xPos = inner_eye[0]/cam.get(cv2.CAP_PROP_FRAME_WIDTH)
+	yPos = inner_eye[1]/cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
+	msg.add_arg(xPos)
+	msg.add_arg(yPos)
+	msg = msg.build()
+	client.send(msg)
 
 
 if cam.isOpened(): # try to get the first frame
@@ -96,7 +111,8 @@ while(ret):
 	# minSize (optional) is the minimum rectangle size to be considered a face
 	faces = face_detector.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=5)
 	# if no faces are detected
-	# when faces are detected, the faces variable is an array of tuple, when no faces are detected the faces variable is an empty tuple
+	# when faces are detected, the faces variable is an array of tuple, 
+	# when no faces are detected the faces variable is an empty tuple
 	if isinstance(faces, tuple):
 		noface_counter+=1
 		found_face = False
@@ -138,24 +154,24 @@ while(ret):
 				emotion_text.clear()
 				shirt_color.clear()
 				wearing_glasses.clear()
-				# print("lost your face!")
 			# face is still there
 			else:
 				# send coordinates to max so avatar looks at face
-				rect = dlib.rectangle(x,y,x+w,y+h)
-				landmarks = predictor(gray_img, rect)
-				landmarks = landmarks_to_np(landmarks)
-				inner_eye = landmarks[3]
-				cv2.circle(img, (inner_eye[0], inner_eye[1]), 20, 100)
-				msg = osc_message_builder.OscMessageBuilder(address="/lookAt")
+				sendCoords(x,y,w,h,gray_img)
+				# rect = dlib.rectangle(x,y,x+w,y+h)
+				# landmarks = predictor(gray_img, rect)
+				# landmarks = landmarks_to_np(landmarks)
+				# inner_eye = landmarks[3]
+				# cv2.circle(img, (inner_eye[0], inner_eye[1]), 20, 100)
+				# msg = osc_message_builder.OscMessageBuilder(address="/lookAt")
 				# print("xPos ", inner_eye[0])
 
-				xPos = inner_eye[0]/cam.get(cv2.CAP_PROP_FRAME_WIDTH)
-				yPos = inner_eye[1]/cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
-				msg.add_arg(xPos)
-				msg.add_arg(yPos)
-				msg = msg.build()
-				client.send(msg)
+				# xPos = inner_eye[0]/cam.get(cv2.CAP_PROP_FRAME_WIDTH)
+				# yPos = inner_eye[1]/cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
+				# msg.add_arg(xPos)
+				# msg.add_arg(yPos)
+				# msg = msg.build()
+				# client.send(msg)
 				# if we're still determining this face isn't someone quickly entering and exiting
 				if not face_analyze:
 					face_counter += 1
@@ -164,7 +180,7 @@ while(ret):
 						face_analyze = True
 				# we're ready to analyze this face!
 				if face_analyze:
-					# print("analyzing face!")
+					print("ANALYZING FACE")
 					x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
 					gray_face_og = gray_img[y1:y2, x1:x2]
 					x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), crop_offsets)
@@ -181,13 +197,6 @@ while(ret):
 					emotion_label_arg = np.argmax(emotion_classifier.predict(gray_face))
 					emotion_text.append(emotion_labels[emotion_label_arg])
 
-					# get gender
-					# rgb_face = np.expand_dims(rgb_face, 0)
-					# rgb_face = preprocess_input(rgb_face, False)
-					# gender_prediction = gender_classifier.predict(rgb_face)
-					# gender_label_arg = np.argmax(gender_prediction)
-					# gender_text.append(gender_labels[gender_label_arg])
-
 					# eyeglasses
 					rect = dlib.rectangle(x,y,x+w,y+h)
 					landmarks = predictor(gray_img, rect)
@@ -201,8 +210,15 @@ while(ret):
 					# shirt color
 					s_y = face_y + int(face_h * 1.65)
 					s_h = face_h + int(face_h * 1.25)
-					shirt_region = rgb_img[s_y:s_y+s_h, x1:x2]
-
+					s_y2 = s_y+s_h
+					# ensure shirt_region doesn't extend outside of image
+					if x2 > cam.get(cv2.CAP_PROP_FRAME_WIDTH):
+						x2 = cam.get(cv2.CAP_PROP_FRAME_WIDTH) -1
+					if s_y2 > cam.get(cv2.CAP_PROP_FRAME_HEIGHT):
+						s_y2 = cam.get(cv2.CAP_PROP_FRAME_HEIGHT) - 1
+					if x1 < 0:
+						x1=0
+					shirt_region = rgb_img[s_y:s_y2+s_h, x1:x2]
 					if type(shirt_region) is not 'NoneType':
 						shirt_image = Image.fromarray(shirt_region, 'RGB')
 						hist = shirt_image.histogram()
@@ -228,7 +244,6 @@ while(ret):
 						cv2.rectangle(img,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
 						# actual_name, closest_name = get_color_name( (int(new_r),int(new_g),int(new_b)) )
 						color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
-						# magik_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
 						# print(color_name)
 						shirt_color.append(color_name)
 
@@ -250,89 +265,45 @@ while(ret):
 						# Reset everything
 						avg_counter = 0
 						emotion_text.clear()
-						# gender_text.clear()
 						wearing_glasses.clear()
 						shirt_color.clear()
 						found_face = False
 						face_analyze = False
 						face_counter = 0
+						find_face_mode = False
 				
-		# still looking for a face to focus on
+		# still looking for a face to focus on OR looping through faces
 		else:	
-			shuffle_faces = random.shuffle(faces)
+			# if more than one face, loop through looking at face
+			if len(faces) > 1 and face_looking is False and find_face_mode is False:
+				face_looking = True
+				print("LOOKING MODE")
+			np.random.shuffle(faces)
 			for (x,y,w,h) in faces: 
-				# we found a face!
-				# print("found a face")
-				found_face = True;
-				face_x, face_y, face_w, face_h = x,y,w,h
-				break
-
-				# x1,x2,y1,y2 = apply_offsets((x,y,w,h), emotion_offsets)
-				# gray_face_og = gray_img[y1:y2, x1:x2]
-				# x1,x2,y1,y2 = apply_offsets((x,y,w,h), gender_offsets)
-				# rgb_face_og = rgb_img[y1:y2, x1:x2]
-				# try:
-				# 	gray_face = cv2.resize(gray_face_og, (emotion_target_size))
-				# 	rgb_face = cv2.resize(rgb_face_og, (gender_target_size))
-				# except:
-				# 	continue
-				# # get emotion
-				# gray_face = preprocess_input(gray_face, False)
-				# gray_face = np.expand_dims(gray_face, 0)
-				# gray_face = np.expand_dims(gray_face, -1)
-				# emotion_label_arg = np.argmax(emotion_classifier.predict(gray_face))
-				# emotion_text.append(emotion_labels[emotion_label_arg])
-
-				# # get gender
-				# rgb_face = np.expand_dims(rgb_face, 0)
-				# rgb_face = preprocess_input(rgb_face, False)
-				# gender_prediction = gender_classifier.predict(rgb_face)
-				# gender_label_arg = np.argmax(gender_prediction)
-				# gender_text.append(gender_labels[gender_label_arg])
-
-				# # eyeglasses
-				# rect = dlib.rectangle(x,y,x+w,y+h)
-				# landmarks = predictor(gray_img, rect)
-				# landmarks = landmarks_to_np(landmarks)
-				# LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
-				# aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
-				# wearing_glasses.append(judge_eyeglass(aligned_face))
-
-				# avg_counter += 1
-				# print(avg_counter)
-
-				# shirt color
-				# s_y = int(h * 1.25)
-				# s_h = int(h * 1.25)
-				# shirt_region = rgb_img[s_y:s_y+s_h, x:x+w]
-				# b, g, r = np.mean(shirt_region, axis=(0,1))
-				# actual_name, closest_name = get_color_name((r,g,b))
-				# print(actual_name, closest_name)
-
-				# if avg_counter > 50:
-				# 	print("HERE")
-				# 	# get timestamp
-				# 	ts = time.gmtime()
-				# 	timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
-				# 	fileName = "../faces/face" + timestamp + ".jpg"
-				# 	cv2.imwrite(fileName, rgb_face_og)
-				# 	caption = mode(emotion_text) + " " + mode(gender_text)
-				# 	if mode(wearing_glasses):
-				# 		caption += " and is wearing glasses"
-				# 	subprocess.call([r'C:/Users/NUC6-USER/take-my-pic/insta.bat', fileName, caption])
-				# 	# exit the loop
-				# 	ret = False
-				# 	avg_counter = 0
-				# 	emotion_text = []
-				# 	gender_text = []
-				# 	wearing_glasses = []
-				# 	shirt_color = []
-
+				if face_looking:
+					# look at each face for three seconds
+					t_end = time.time() + 3
+					msg = osc_message_builder.OscMessageBuilder(address="/newFace")
+					msg = msg.build()
+					client.send(msg)
+					while time.time() < t_end:
+						sendCoords(x,y,w,h,gray_img)
+				# we are now focusing on one face
+				else:
+					print("FINDING FACE")
+					found_face = True;
+					face_x, face_y, face_w, face_h = x,y,w,h	
+					break
+			face_loop += 1
+			if face_loop > 1:
+				face_loop = 0
+				face_looking = False
+				find_face_mode = True
 	cv2.imshow('test window', img)
 	k = cv2.waitKey(30 & 0xff)
 	if k == 27: 	# press ESC to quit
 		break
  
 # # end of program
-# cam.release()
-# cv2.destroyAllWindows()
+cam.release()
+cv2.destroyAllWindows()
