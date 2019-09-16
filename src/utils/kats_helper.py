@@ -94,38 +94,57 @@ def judge_eyeglass(img):
     measure_1 = sum(sum(roi_1/255)) / (np.shape(roi_1)[0] * np.shape(roi_1)[1])
     measure_2 = sum(sum(roi_2/255)) / (np.shape(roi_2)[0] * np.shape(roi_2)[1])
     measure = measure_1*0.3 + measure_2*0.7
-    
-    # cv2.imshow('roi_1',roi_1)
-    # cv2.imshow('roi_2',roi_2)
-    # print(measure)
-    
    
     # Determine the discriminant value based on the relationship 
     # between the evaluation value and the threshold
-    if measure > 0.15:
+    if measure > 0.25:
         judge = True
     else:
         judge = False
     # print(judge)
     return judge
 
-def closest_color(requested_color):
-    min_colors = {}
-    for key, name in webcolors.css3_hex_to_names.items():
-        r_c, g_c, b_c = webcolors.hex_to_rgb(key)
-        rd = (r_c - requested_color[0]) ** 2
-        gd = (g_c - requested_color[1]) ** 2
-        bd = (b_c - requested_color[2]) ** 2
-        min_colors[(rd + gd + bd)] = name
-    return min_colors[min(min_colors.keys())]
+def resizeAndPad(img, size, padColor=0):
 
-def get_color_name(requested_color):
-    try:
-        closest_name = actual_name = webcolors.rgb_to_name(requested_color)
-    except ValueError:
-        closest_name = closest_color(requested_color)
-        actual_name = None
-    return actual_name, closest_name
+    h, w = img.shape[:2]
+    sh, sw = size
+
+    if h > sh or w > sw: # shirking image
+        interp = cv2.INTER_AREA
+    else:   # streching image
+        interp = cv2.INTER_CUBIC
+
+    # aspect ratio of image
+    aspect = w/h 
+    saspect = sw/sh
+
+    # compute scaling and pad sizing
+    if aspect > 1: # horizontal image
+        new_w = sw
+        new_h = np.round(new_w/aspect).astype(int)
+        pad_vert = (sh-new_h)/2
+        pad_top, pad_bot = np.floor(pad_vert).astype(int), np.ceil(pad_vert).astype(int)
+        pad_left, pad_right = 0, 0
+    elif aspect < 1: # vertical image
+        new_h = sh
+        new_w = np.round(new_h*aspect).astype(int)
+        pad_horz = (sw-new_w)/2
+        pad_left, pad_right = np.floor(pad_horz).astype(int), np.ceil(pad_horz).astype(int)
+        pad_top, pad_bot = 0, 0
+    else: # square image
+        new_h, new_w = sh, sw
+        pad_left, pad_right, pad_top, pad_bot = 0, 0, 0, 0
+
+    # set pad color
+    if len(img.shape) is 3 and not isinstance(padColor, (list, tuple, np.ndarray)): # color image but only one color provided
+        padColor = [padColor]*3
+
+    # scale and pad
+    scaled_img = cv2.resize(img, (new_w, new_h), interpolation=interp)
+    scaled_img = cv2.copyMakeBorder(scaled_img, pad_top, pad_bot, pad_left, pad_right, borderType=cv2.BORDER_CONSTANT, value=padColor)
+
+    return scaled_img
+
 
 def rgb_to_hsv(r, g, b):
     r = float(r)
@@ -1018,4 +1037,4 @@ class ColorNames:
             if mindiff is None or diff < mindiff:  
                 mindiff = diff  
                 mincolorname = d  
-        return mincolorname          
+        return mincolorname
