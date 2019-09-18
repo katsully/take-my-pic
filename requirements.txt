@@ -13,3 +13,5 @@ matplotlib
 h5py
 instapy-cli
 webcolors
+bs4
+selenium

@@ -422,7 +422,7 @@ while(ret):
 								emotion_list_counter = 0
 						else:
 							emotion_list_counter += 1
-						second_caption = "Human in " + shirt_list + " garment"
+						second_caption = "Person in " + shirt_list + " garment"
 						if max(set(wearing_glasses), key=wearing_glasses.count):
 							emotion_caption += " and bespeckled eyes"
 						pil_img = cv2.cvtColor(final_final_img,cv2.COLOR_BGR2RGB)
