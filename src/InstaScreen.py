@@ -7,16 +7,14 @@ import glob
 import os
 import numpy as np
 
-url = 'http://instagram.com/lookingtogether/'
-driver = webdriver.Chrome()
-driver.get(url)
-
-soup = BeautifulSoup(driver.page_source, features="html5lib")
-
-all_photos = []
-
 # adding photo from other machine to our database
 def add_new_photo():
+	url = 'http://instagram.com/lookingtogether/'
+	driver = webdriver.Chrome()
+	driver.get(url)
+
+	soup = BeautifulSoup(driver.page_source, features="html5lib")
+
 	newest_img = soup.find_all('img')[1]
 	image_url = image['src']
 	img = Image.open(requests.get(image_url, stream = True).raw)
@@ -25,8 +23,8 @@ def add_new_photo():
 	fileName = "../faces/face" + timestamp + ".png"
 	cv2.imwrite(fileName, img)
 
-# no longer need insta
-driver.quit()
+	# no longer need insta
+	driver.quit()
 
 all_photos = glob.glob('../faces/*')
 most_recent = max(all_photos, key=os.path.getctime)
