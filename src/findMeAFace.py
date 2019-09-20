@@ -2,9 +2,10 @@ import cv2
 from keras.models import load_model
 import numpy as np
 import dlib
-from pythonosc import osc_server
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
+from pythonosc import dispatcher
+from pythonosc import osc_server
 import subprocess
 import time
 from imutils import face_utils
@@ -23,11 +24,22 @@ from utils.kats_helper import rgb_to_hsv
 from utils.kats_helper import hsv_to_rgb
 from utils.kats_helper import ColorNames
 from utils.kats_helper import resizeAndPad
+from InstaScreen import update_screen
+from InstaScreen import update_screen
 
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
+# new photo from other avatar
+dispatcher = dispatcher.Dispatcher()
+dispatcher.map("/update_photo", avatar2_photo)
+
+server = osc_server.ThreadOSCUSPServer(("127.0.0.1", 8002), dispatcher)
+server.serve_forever()
+
+def avatar2_photo:
+	insta_grid = add_new_photo()
 
 cam = cv2.VideoCapture(0)
 cam.set(3,1920)	# width
@@ -128,6 +140,9 @@ new_emotion=""
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 
+# pull up instagram screen
+insta_grid = update_screen()
+
 if cam.isOpened(): # try to get the first frame
 	ret, img = cam.read()
 	# print("width ", cam.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -182,12 +197,6 @@ while(ret):
 			faces = face_detector.detectMultiScale(cropped_img, scaleFactor=1.3, minNeighbors=6)
 			# is the face gone?
 			if isinstance(faces, tuple):
-				# print("FACE GONE")
-				# tell matt we lost the face after a significant amount of tracking
-				# if face_analyze:
-				# 	msg = osc_message_builder.OscMessageBuilder(address="/lostFace")
-				# 	msg = msg.build()
-				# 	client.send(msg)
 				found_face = False
 				face_counter = 0
 				face_analyze = False
@@ -198,23 +207,6 @@ while(ret):
 				# print("lost your face!")
 			# face is still there
 			else:
-				# send coordinates to max so avatar looks at face
-				# sendCoords(x,y,w,h)
-				# rect = dlib.rectangle(x,y,x+w,y+h)
-				# landmarks = predictor(gray_img, rect)
-				# landmarks = landmarks_to_np(landmarks)
-				# inner_eye = landmarks[3]
-				# cv2.circle(img, (inner_eye[0], inner_eye[1]), 20, 100)
-				# msg = osc_message_builder.OscMessageBuilder(address="/lookAt")
-				# # print("xPos ", inner_eye[0])
-
-				# xPos = inner_eye[0]/cam.get(cv2.CAP_PROP_FRAME_WIDTH)
-				# yPos = inner_eye[1]/cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
-				# msg.add_arg(xPos)
-				# msg.add_arg(yPos)
-				# msg = msg.build()
-				# client.send(msg)
-
 				# if we're still determining this face isn't someone quickly entering and exiting
 				if not face_analyze:
 					face_counter += 1
@@ -230,7 +222,7 @@ while(ret):
 							face_analyze = True
 				# we're ready to analyze this face!
 				if face_analyze:
-					# print("analyzing face!")
+					print("analyzing face!")
 					x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
 					gray_face_og = gray_img[y1:y2, x1:x2]
 					x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), gender_offsets)
@@ -301,9 +293,7 @@ while(ret):
 						new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
 						print("new averages", new_r, new_g, new_b)
 						# cv2.rectangle(flipped,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
-						# actual_name, closest_name = get_color_name( (int(new_r),int(new_g),int(new_b)) )
 						color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
-						# magik_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
 						# print(color_name)
 						shirt_color.append(color_name)
 
@@ -433,8 +423,12 @@ while(ret):
 						draw.text((aspect_ratio_w * .18, aspect_ratio_w + (aspect_ratio_w * .2)), "2019", (0,0,0), font=ft_color)
 						draw.text((aspect_ratio_w * .18, aspect_ratio_w + (aspect_ratio_w * .28)), "Collection of the artist", (0,0,0), font=ft_collection)
 						cv2img = cv2.cvtColor(np.array(pilimg),cv2.COLOR_RGB2BGR)
+						# save file to faces database
 						cv2.imwrite(fileName, cv2img)
+						# post to instagram
 						subprocess.call([r'C:/Users/student/Documents/GabeSanFran/take-my-pic/insta.bat', fileName, emotion_caption])
+						# update instgram screen
+						insta_grid = update_screen()
 						test_pass = False
 						num_of_pics += 1
 						t_end = time.time() + 60 * 2
@@ -464,34 +458,21 @@ while(ret):
 						found_face = False
 						face_analyze = False
 						face_counter = 0
-						# find_face_mode = False
 				
 		# still looking for a face to focus on
 		else:	
-			# if more than one face, loop through looking at face
-			# if len(faces) > 1 and face_looking is False and find_face_mode is False:
-			# 	face_looking = True
-			# 	print("LOOKING MODE")
 			np.random.shuffle(faces)
 			for (x,y,w,h) in faces: 
-				# if face_looking:
-					# # look at each frame for three seconds
-					# t_end = time.time() + 3
-					# msg = osc_message_builder.OscMessageBuilder(address="/newFace")
-					# msg = msg.build()
-					# client.send(msg)
-					# while time.time() < t_end:
-						# sendCoords(x,y,w,h)
-				# we are now focusing on one face
-				# else:
 				found_face = True;
+				print("FOUND FACE")
 				face_x, face_y, face_w, face_h = x,y,w,h
 				# x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), crop_offsets)
 				# crop image so we only focus on this face
 				# cropped_img = gray_img[y1:y2, x1:x2]
 				break
 
-	cv2.imshow('test window', flipped)
+	cv2.imshow("test window", flipped)
+	cv2.imshow("insta", insta_grid)
 	k = cv2.waitKey(30 & 0xff)
 	if k == 27: 	# press ESC to quit
 		break
