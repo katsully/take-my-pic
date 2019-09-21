@@ -4,10 +4,6 @@ import numpy as np
 import dlib
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
-from pythonosc import dispatcher
-# from pythonosc import osc_server
-from pythonosc.osc_server import AsyncIOOSCUDPServer
-import asyncio
 import subprocess
 import time
 from imutils import face_utils
@@ -25,487 +21,430 @@ from utils.kats_helper import judge_eyeglass
 from utils.kats_helper import rgb_to_hsv
 from utils.kats_helper import hsv_to_rgb
 from utils.kats_helper import ColorNames
-from InstaScreen import gabe_flash
-from InstaScreen import update_screen
-from InstaScreen import add_new_photo
 
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
 
-
-# new photo from other avatar
-def avatar2_photo(*params):
-	global insta_grid
-	print("heard ya!")
-	insta_grid = add_new_photo()
-
-dispatcher = dispatcher.Dispatcher()
-dispatcher.map("/update_photo", avatar2_photo)
-
-ip = "127.0.0.1"
-port = 8002
-
-# global variables
 cam = cv2.VideoCapture(0)
-insta_grid = np.zeros((500,500,3), np.uint8)
-
-cv2.namedWindow("insta", flags=cv2.WND_PROP_FULLSCREEN)
-cv2.setWindowProperty("insta", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-cv2.moveWindow("insta", 1920, 0)
+cam.set(3,1920)	# width
+cam.set(4,1080)  # height
 
 
-async def loopFunc():
-	cam.set(3,1920)	# width
-	cam.set(4,1080)  # height
+face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
+emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
+emotion_labels = get_labels('fer2013')
+gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
+gender_labels = get_labels('imdb')
 
-	global insta_grid
+# eyeglasses
+predictor_path = "../data/shape_predictor_5_face_landmarks.dat"
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor(predictor_path)
 
-	face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
-	emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
-	emotion_labels = get_labels('fer2013')
-	gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
-	gender_labels = get_labels('imdb')
+# build udp_client for osc protocol
+client = udp_client.UDPClient("", 8001)
+# counter for collecting the avg info about a person
+avg_counter = 0
+face_counter = 0
+emotion_text = []
+# gender_text = []
+wearing_glasses = []
+shirt_color = []
+found_face = False;
+face_x = 0
+face_y = 0
+face_w = 0
+face_h = 0
+face_analyze = False
+gender_text = []
+shirt_brightness = ""
 
-	# eyeglasses
-	predictor_path = "../data/shape_predictor_5_face_landmarks.dat"
-	detector = dlib.get_frontal_face_detector()
-	predictor = dlib.shape_predictor(predictor_path)
+cropped_img = None
 
-	# build udp_client for osc protocol
-	client = udp_client.UDPClient("", 8001)
-	# counter for collecting the avg info about a person
-	avg_counter = 0
-	face_counter = 0
-	emotion_text = []
-	# gender_text = []
-	wearing_glasses = []
-	shirt_color = []
-	found_face = False;
-	face_x = 0
-	face_y = 0
-	face_w = 0
-	face_h = 0
-	face_analyze = False
-	gender_text = []
-	shirt_brightness = ""
+# hyper-parameters for bounding boxes shape
+crop_offsets = (50, 70)
+gender_offsets = (30, 60)
+emotion_offsets = (20, 40)
 
-	cropped_img = None
+# loading models
+emotion_classifier = load_model(emotion_model_path, compile=False)
+gender_classifier = load_model(gender_model_path, compile=False)
 
-	# hyper-parameters for bounding boxes shape
-	crop_offsets = (50, 70)
-	gender_offsets = (30, 60)
-	emotion_offsets = (20, 40)
+# getting input model shapes for inference
+emotion_target_size = emotion_classifier.input_shape[1:3]
+gender_target_size = gender_classifier.input_shape[1:3]
 
-	# loading models
-	emotion_classifier = load_model(emotion_model_path, compile=False)
-	gender_classifier = load_model(gender_model_path, compile=False)
+# OSC
+client = udp_client.UDPClient("127.0.0.1", 8001)
 
-	# getting input model shapes for inference
-	emotion_target_size = emotion_classifier.input_shape[1:3]
-	gender_target_size = gender_classifier.input_shape[1:3]
+looking_for = ["glasses", "man", "woman", "light_shirt", "dark_shirt"]
+looking_for_count = 0
+num_of_pics = 0
+test_pass = False
 
-	# OSC
-	client = udp_client.UDPClient("10.18.235.227", 8001)
+# font
+ft_bold = ImageFont.truetype(font="NewsGothicStd-BoldOblique.otf",size=40)
+ft_color = ImageFont.truetype(font="News Gothic Regular.otf",size=32)
+ft_collection = ImageFont.truetype(font="News Gothic Regular.otf",size=18)
 
-	looking_for = ["glasses", "man", "woman", "light_shirt", "dark_shirt"]
-	looking_for_count = 0
-	num_of_pics = 0
-	test_pass = False
+# captions
+text_file = open("emotions.txt", "r")
+emotion_list = [line.rstrip() for line in text_file.readlines()]
+emotion_list_counter = 0
+angry_file = open("anger.txt", "r")
+sad_file = open("sadness.txt", "r")
+disgust_file = open("disgust.txt", "r")
+happy_file = open("happiness.txt", "r")
+surprise_file = open("surprise.txt", "r")
+neutral_file = open("neutral.txt", "r")
+fear_file = open("fear.txt", "r")
+angry_list = [line.rstrip() for line in angry_file.readlines()]
+angry_file.close()
+sad_list = [line.rstrip() for line in sad_file.readlines()]
+sad_file.close()
+disgust_list = [line.rstrip() for line in disgust_file.readlines()]
+disgust_file.close()
+happy_list = [line.rstrip() for line in happy_file.readlines()]
+happy_file.close()
+surprise_list = [line.rstrip() for line in surprise_file.readlines()]
+surprise_file.close()
+neutral_list = [line.rstrip() for line in neutral_file.readlines()]
+neutral_file.close()
+fear_list = [line.rstrip() for line in fear_file.readlines()]
+fear_file.close()
+angry_counter = 0
+sad_counter = 0
+disgust_counter = 0
+happy_counter = 0
+surprise_counter = 0
+neutral_counter = 0
+fear_counter = 0
+new_emotion=""
 
-	# font
-	ft_bold = ImageFont.truetype(font="NewsGothicStd-BoldOblique.otf",size=40)
-	ft_color = ImageFont.truetype(font="News Gothic Regular.otf",size=32)
-	ft_collection = ImageFont.truetype(font="News Gothic Regular.otf",size=18)
+tracking_faces = True
+no_moments_counter = 0
 
-	# captions
-	text_file = open("emotions.txt", "r")
-	emotion_list = [line.rstrip() for line in text_file.readlines()]
-	emotion_list_counter = 0
-	angry_file = open("anger.txt", "r")
-	sad_file = open("sadness.txt", "r")
-	disgust_file = open("disgust.txt", "r")
-	happy_file = open("happiness.txt", "r")
-	surprise_file = open("surprise.txt", "r")
-	neutral_file = open("neutral.txt", "r")
-	fear_file = open("fear.txt", "r")
-	angry_list = [line.rstrip() for line in angry_file.readlines()]
-	angry_file.close()
-	sad_list = [line.rstrip() for line in sad_file.readlines()]
-	sad_file.close()
-	disgust_list = [line.rstrip() for line in disgust_file.readlines()]
-	disgust_file.close()
-	happy_list = [line.rstrip() for line in happy_file.readlines()]
-	happy_file.close()
-	surprise_list = [line.rstrip() for line in surprise_file.readlines()]
-	surprise_file.close()
-	neutral_list = [line.rstrip() for line in neutral_file.readlines()]
-	neutral_file.close()
-	fear_list = [line.rstrip() for line in fear_file.readlines()]
-	fear_file.close()
-	angry_counter = 0
-	sad_counter = 0
-	disgust_counter = 0
-	happy_counter = 0
-	surprise_counter = 0
-	neutral_counter = 0
-	fear_counter = 0
-	new_emotion=""
 
-	tracking_faces = True
-	no_moments_counter = 0
-	gabe_flash_counter = 0
-	flash_done = False
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 
-	cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
-	cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 
-	# pull up instagram screen
-	insta_grid = update_screen()
+if cam.isOpened(): # try to get the first frame
+	ret, img = cam.read()
+else:
+    ret = False
 
-	if cam.isOpened(): # try to get the first frame
-		ret, img = cam.read()
+while(ret):
+	# moments to Matt
+	msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
+	if tracking_faces:
+		msg.add_arg(0)
 	else:
-	    ret = False
+		msg.add_arg(1)
+		no_moments_counter -= 1
+		if no_moments_counter == 0:
+			tracking_faces = True
+	msg = msg.build()
+	client.send(msg)
 
-	while(ret):
-		await asyncio.sleep(0)
-		# moments to Matt
-		msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
-		if tracking_faces:
-			msg.add_arg(0)
+	if tracking_faces:
+		ret, img = cam.read()
+		# flip camera 90 degrees
+		rotate = imutils.rotate_bound(img, 90)
+		flipped = cv2.flip(rotate, 1)
+		# convert image to grayscale
+		gray_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
+		# convert from bgr to rgb
+		rgb_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2RGB)
+		# gray_img is the input grayscale image
+		# scaleFactor (optional) is specifying how much the image size is reduced at each image scale. It is used to create the scale pyramid
+		# minNeighbors (optional) is specifying how many neighbors each candidate rectangle show have, to retain it. A higher number gives lower false positives
+		# minSize (optional) is the minimum rectangle size to be considered a face
+		faces = face_detector.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=6)
+		# if no faces are detected
+		# when faces are detected, the faces variable is an array of tuple, when no faces are detected the faces variable is an empty tuple
+		if isinstance(faces, tuple):
+			# reset 
+			found_face = False
+			face_analyze = False
+			face_counter = 0
+			avg_counter = 0
+			emotion_text.clear()
+			gender_text.clear()
+			wearing_glasses.clear()
+			shirt_color.clear()
+
+		# camera found one or more faces
 		else:
-			msg.add_arg(1)
-			no_moments_counter -= 1
-			gabe_flash_counter -= 1
-			if no_moments_counter == 0:
-				tracking_faces = True
-			if gabe_flash_counter == 0 and flash_done == False:
-				insta_grid = update_screen()
-				flash_done = True
-		msg = msg.build()
-		client.send(msg)
+			# focusing on a single face
+			if found_face:
+				x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), crop_offsets)
+				# crop image so we only focus on this face
+				cropped_img = gray_img[y1:y2, x1:x2]
+				faces = face_detector.detectMultiScale(cropped_img, scaleFactor=1.3, minNeighbors=6)
+				# is the face gone?
+				if isinstance(faces, tuple):
+					found_face = False
+					face_counter = 0
+					face_analyze = False
+					emotion_text.clear()
+					shirt_color.clear()
+					gender_text.clear()
+					wearing_glasses.clear()
+				# face is still there
+				else:
+					# if we're still determining this face isn't someone quickly entering and exiting
+					if not face_analyze:
+						face_counter += 1
+						# face isn't just coming and going
+						if face_counter > 5:
+							face_analyze = True
+					# we're ready to analyze this face!
+					if face_analyze:
+						x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
+						gray_face_og = gray_img[y1:y2, x1:x2]
+						x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), gender_offsets)
+						rgb_face_og = rgb_img[y1:y2, x1:x2]
+						try:
+							gray_face = cv2.resize(gray_face_og, (emotion_target_size))
+							rgb_face = cv2.resize(rgb_face_og, (gender_target_size))
+						except:
+							continue
+						# get emotion
+						gray_face = preprocess_input(gray_face, False)
+						gray_face = np.expand_dims(gray_face, 0)
+						gray_face = np.expand_dims(gray_face, -1)
+						emotion_label_arg = np.argmax(emotion_classifier.predict(gray_face))
+						emotion_text.append(emotion_labels[emotion_label_arg])
 
-		if tracking_faces:
-			ret, img = cam.read()
-			# flip camera 90 degrees
-			rotate = imutils.rotate_bound(img, 90)
-			flipped = cv2.flip(rotate, 1)
-			# convert image to grayscale
-			gray_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
-			# convert from bgr to rgb
-			rgb_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2RGB)
-			# gray_img is the input grayscale image
-			# scaleFactor (optional) is specifying how much the image size is reduced at each image scale. It is used to create the scale pyramid
-			# minNeighbors (optional) is specifying how many neighbors each candidate rectangle show have, to retain it. A higher number gives lower false positives
-			# minSize (optional) is the minimum rectangle size to be considered a face
-			faces = face_detector.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=6)
-			# if no faces are detected
-			# when faces are detected, the faces variable is an array of tuple, when no faces are detected the faces variable is an empty tuple
-			if isinstance(faces, tuple):
-				# reset 
-				found_face = False
-				face_analyze = False
-				face_counter = 0
-				avg_counter = 0
-				emotion_text.clear()
-				gender_text.clear()
-				wearing_glasses.clear()
-				shirt_color.clear()
+						# get gender
+						rgb_face = np.expand_dims(rgb_face, 0)
+						rgb_face = preprocess_input(rgb_face, False)
+						gender_prediction = gender_classifier.predict(rgb_face)
+						gender_label_arg = np.argmax(gender_prediction)
+						gender_text.append(gender_labels[gender_label_arg])
 
-			# camera found one or more faces
-			else:
-				# focusing on a single face
-				if found_face:
-					x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), crop_offsets)
-					# crop image so we only focus on this face
-					cropped_img = gray_img[y1:y2, x1:x2]
-					faces = face_detector.detectMultiScale(cropped_img, scaleFactor=1.3, minNeighbors=6)
-					# is the face gone?
-					if isinstance(faces, tuple):
-						found_face = False
-						face_counter = 0
-						face_analyze = False
-						emotion_text.clear()
-						shirt_color.clear()
-						gender_text.clear()
-						wearing_glasses.clear()
-						# print("lost your face!")
-					# face is still there
-					else:
-						# if we're still determining this face isn't someone quickly entering and exiting
-						if not face_analyze:
-							face_counter += 1
-							# face isn't just coming and going
-							if face_counter > 5:
-								face_analyze = True
-						# we're ready to analyze this face!
-						if face_analyze:
-							x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
-							gray_face_og = gray_img[y1:y2, x1:x2]
-							x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), gender_offsets)
-							rgb_face_og = rgb_img[y1:y2, x1:x2]
-							try:
-								gray_face = cv2.resize(gray_face_og, (emotion_target_size))
-								rgb_face = cv2.resize(rgb_face_og, (gender_target_size))
-							except:
-								continue
-							# get emotion
-							gray_face = preprocess_input(gray_face, False)
-							gray_face = np.expand_dims(gray_face, 0)
-							gray_face = np.expand_dims(gray_face, -1)
-							emotion_label_arg = np.argmax(emotion_classifier.predict(gray_face))
-							emotion_text.append(emotion_labels[emotion_label_arg])
+						# eyeglasses
+						# TODO: FIX THIS
+						# rect = dlib.rectangle(face_x, face_y, face_x+face_w, face_y+face_h)
+						# landmarks = predictor(gray_img, rect)
+						# landmarks = landmarks_to_np(landmarks)
+						# LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
+						# aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
+						# wearing_glasses.append(judge_eyeglass(aligned_face))
+						wearing_glasses.append(False)
 
-							# get gender
-							rgb_face = np.expand_dims(rgb_face, 0)
-							rgb_face = preprocess_input(rgb_face, False)
-							gender_prediction = gender_classifier.predict(rgb_face)
-							gender_label_arg = np.argmax(gender_prediction)
-							gender_text.append(gender_labels[gender_label_arg])
+						avg_counter += 1
 
-							# eyeglasses
-							# TODO: FIX THIS
-							# rect = dlib.rectangle(face_x, face_y, face_x+face_w, face_y+face_h)
-							# landmarks = predictor(gray_img, rect)
-							# landmarks = landmarks_to_np(landmarks)
-							# LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
-							# aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
-							# wearing_glasses.append(judge_eyeglass(aligned_face))
-							wearing_glasses.append(False)
+						# shirt color
+						s_y = face_y + int(face_h * 1.65)
+						s_h = face_h + int(face_h * 1.25)
+						s_y2 = s_y+s_h
+						# ensure shirt region doesn't extend outside of image
+						rgb_height, rgb_width = rgb_img.shape[:2]
+						if x2 >= rgb_width:
+							x2 = rgb_width -1
+						if s_y2 >= rgb_height:
+							s_y2 = rgb_height -1
+						if x1 < 0:
+							x1 = 0
+						shirt_region = rgb_img[s_y:int(s_y2), x1:x2]
 
-							avg_counter += 1
+						if type(shirt_region) is not 'NoneType':
+							shirt_image = Image.fromarray(shirt_region, 'RGB')
+							hist = shirt_image.histogram()
+							# split into red, green, blue
+							r = hist[0:256]
+							g = hist[256:256*2]
+							b = hist[256*2: 256*3]
 
-							# shirt color
-							s_y = face_y + int(face_h * 1.65)
-							s_h = face_h + int(face_h * 1.25)
-							s_y2 = s_y+s_h
-							# ensure shirt region doesn't extend outside of image
-							rgb_height, rgb_width = rgb_img.shape[:2]
-							if x2 >= rgb_width:
-								x2 = rgb_width -1
-							if s_y2 >= rgb_height:
-								s_y2 = rgb_height -1
+							# perform the weighted average of each channel
+							# the *index* is the channel value, and the *value* is its weight
+							avg_r = sum( i*w for i, w in enumerate(r) ) / sum(r)
+							avg_g = sum( i*w for i, w in enumerate(g) ) / sum(g)
+							avg_b = sum( i*w for i, w in enumerate(b) ) / sum(b)
+
+							avg_h, avg_s, avg_v = rgb_to_hsv(avg_r, avg_g, avg_b)
+							
+							# up the saturation and brightness
+							avg_s += .2
+							avg_v += avg_v * .12
+
+							new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
+							print("new averages", new_r, new_g, new_b)
+							# cv2.rectangle(flipped,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
+							color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
+							shirt_color.append(color_name)
+
+						if avg_counter > 30:
+							# if looking_for[looking_for_count] == "glasses" and max(set(wearing_glasses), key=wearing_glasses.count):
+							# 	test_pass = True
+							# elif looking_for[looking_for_count] == "man" and max(set(gender_text), key=gender_text.count) == "man":
+							# 	test_pass = True
+							# elif looking_for[looking_for_count] == "woman" and max(set(gender_text), key=gender_text.count) == "woman":
+							# 	test_pass = True
+							# elif looking_for[looking_for_count] == "light_shirt":
+							# 	avg_shirt_color = max(set(shirt_color), key=shirt_color.count)
+							# 	color_hex = ColorNames.ImageMagickColorMap[avg_shirt_color]
+							# 	color_hex_num = color_hex.replace("#", "0x")
+							# 	color_hex_num = int(color_hex_num, 16)
+							# 	if color_hex_num > 0x708090:
+							# 		test_pass = True
+							# elif looking_for[looking_for_count] == "dark_shirt":
+							# 	avg_shirt_color = max(set(shirt_color), key=shirt_color.count)
+							# 	color_hex = ColorNames.ImageMagickColorMap[avg_shirt_color]
+							# 	color_hex_num = color_hex.replace("#", "0x")
+							# 	color_hex_num = int(color_hex_num, 16)
+							# 	if color_hex_num < 0x708090:
+							# 		test_pass = True
+							# if test_pass:
+							msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
+							msg.add_arg(0)
+							msg = msg.build()
+							client.send(msg)
+							# get timestamp
+							ts = time.gmtime()
+							timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
+							fileName = "../faces/face" + timestamp + ".png"
+							# convert image to 1:1 aspect ratio						
+							x1 -= (x2-x1) * .25
+							x2 += (x2-x1) * .25
+							y1 -= (y2-y1) * .1
+							y2 += (y2-y1) * .45
+							flipped_h, flipped_w = flipped.shape[:2]
 							if x1 < 0:
 								x1 = 0
-							shirt_region = rgb_img[s_y:int(s_y2), x1:x2]
-
-							if type(shirt_region) is not 'NoneType':
-								shirt_image = Image.fromarray(shirt_region, 'RGB')
-								hist = shirt_image.histogram()
-								# split into red, green, blue
-								r = hist[0:256]
-								g = hist[256:256*2]
-								b = hist[256*2: 256*3]
-
-								# perform the weighted average of each channel
-								# the *index* is the channel value, and the *value* is its weight
-								avg_r = sum( i*w for i, w in enumerate(r) ) / sum(r)
-								avg_g = sum( i*w for i, w in enumerate(g) ) / sum(g)
-								avg_b = sum( i*w for i, w in enumerate(b) ) / sum(b)
-
-								avg_h, avg_s, avg_v = rgb_to_hsv(avg_r, avg_g, avg_b)
-								
-								# up the saturation and brightness
-								avg_s += .2
-								avg_v += avg_v * .12
-
-								new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
-								print("new averages", new_r, new_g, new_b)
-								# cv2.rectangle(flipped,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
-								color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
-								shirt_color.append(color_name)
-
-							if avg_counter > 30:
-								# if looking_for[looking_for_count] == "glasses" and max(set(wearing_glasses), key=wearing_glasses.count):
-								# 	test_pass = True
-								# elif looking_for[looking_for_count] == "man" and max(set(gender_text), key=gender_text.count) == "man":
-								# 	test_pass = True
-								# elif looking_for[looking_for_count] == "woman" and max(set(gender_text), key=gender_text.count) == "woman":
-								# 	test_pass = True
-								# elif looking_for[looking_for_count] == "light_shirt":
-								# 	avg_shirt_color = max(set(shirt_color), key=shirt_color.count)
-								# 	color_hex = ColorNames.ImageMagickColorMap[avg_shirt_color]
-								# 	color_hex_num = color_hex.replace("#", "0x")
-								# 	color_hex_num = int(color_hex_num, 16)
-								# 	if color_hex_num > 0x708090:
-								# 		test_pass = True
-								# elif looking_for[looking_for_count] == "dark_shirt":
-								# 	avg_shirt_color = max(set(shirt_color), key=shirt_color.count)
-								# 	color_hex = ColorNames.ImageMagickColorMap[avg_shirt_color]
-								# 	color_hex_num = color_hex.replace("#", "0x")
-								# 	color_hex_num = int(color_hex_num, 16)
-								# 	if color_hex_num < 0x708090:
-								# 		test_pass = True
-								# if test_pass:
-								msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
-								msg.add_arg(0)
-								msg = msg.build()
-								client.send(msg)
-								# get timestamp
-								ts = time.gmtime()
-								timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
-								fileName = "../faces/face" + timestamp + ".png"
-								# convert image to 1:1 aspect ratio						
-								x1 -= (x2-x1) * .25
-								x2 += (x2-x1) * .25
-								y1 -= (y2-y1) * .1
-								y2 += (y2-y1) * .45
-								flipped_h, flipped_w = flipped.shape[:2]
-								if x1 < 0:
-									x1 = 0
-								if x2 >= flipped_w:
-									x2 = flipped_w -1
-								if y1 < 0:
-									y1 = 0
-								if y2 >= flipped_h:
-									y2 = flipped_h -1
-								portrait_img = flipped[int(y1):int(y2), int(x1):int(x2)]
-								scale_percent = 225 # percent of original size
-								bigger_width = int(portrait_img.shape[1] * scale_percent / 100)
-								bigger_height = int(portrait_img.shape[0] * scale_percent / 100)
-								dim = (bigger_width, bigger_height)
-								# resize image
-								resized = cv2.resize(portrait_img, dim, interpolation = cv2.INTER_CUBIC)
-								aspect_ratio_h, aspect_ratio_w = resized.shape[:2]
-								# crop image to be square
-								new_height = aspect_ratio_w 
-								final_img = resized[0:int(new_height), 0:aspect_ratio_w]
-								uniform_size = cv2.resize(final_img, (600,600))
-								new_height, new_width = uniform_size.shape[:2]
-								# white padding around center
-								final_final_img = cv2.copyMakeBorder(uniform_size, int(new_width*.05), int(new_width*.31), int(new_width*.18), int(new_width*.18), borderType=cv2.BORDER_CONSTANT, value=(255,255,255))
-								
-								avg_shirt_color = max(set(shirt_color), key=shirt_color.count)
-								shirt_list = re.findall('[A-Z][^A-Z]*', avg_shirt_color)
-								if shirt_list != []:
-									shirt_list = " ".join(shirt_list)
+							if x2 >= flipped_w:
+								x2 = flipped_w -1
+							if y1 < 0:
+								y1 = 0
+							if y2 >= flipped_h:
+								y2 = flipped_h -1
+							portrait_img = flipped[int(y1):int(y2), int(x1):int(x2)]
+							scale_percent = 225 # percent of original size
+							bigger_width = int(portrait_img.shape[1] * scale_percent / 100)
+							bigger_height = int(portrait_img.shape[0] * scale_percent / 100)
+							dim = (bigger_width, bigger_height)
+							# resize image
+							resized = cv2.resize(portrait_img, dim, interpolation = cv2.INTER_CUBIC)
+							aspect_ratio_h, aspect_ratio_w = resized.shape[:2]
+							# crop image to be square
+							new_height = aspect_ratio_w 
+							final_img = resized[0:int(new_height), 0:aspect_ratio_w]
+							uniform_size = cv2.resize(final_img, (600,600))
+							new_height, new_width = uniform_size.shape[:2]
+							# white padding around center
+							final_final_img = cv2.copyMakeBorder(uniform_size, int(new_width*.05), int(new_width*.31), int(new_width*.18), int(new_width*.18), borderType=cv2.BORDER_CONSTANT, value=(255,255,255))
+							
+							avg_shirt_color = max(set(shirt_color), key=shirt_color.count)
+							shirt_list = re.findall('[A-Z][^A-Z]*', avg_shirt_color)
+							if shirt_list != []:
+								shirt_list = " ".join(shirt_list)
+							else:
+								shirt_list = avg_shirt_color
+							shirt_list = ''.join([i for i in shirt_list if not i.isdigit()])
+							# sad, surprise, happy, angry, neutral, disgust, and fear
+							emotion_caption = max(set(emotion_text), key=emotion_text.count)
+							if emotion_caption == "sad":
+								new_emotion = sad_list[sad_counter]
+								if sad_counter == len(sad_list)-1:
+									sad_counter = 0
 								else:
-									shirt_list = avg_shirt_color
-								shirt_list = ''.join([i for i in shirt_list if not i.isdigit()])
-								# sad, surprise, happy, angry, neutral, disgust, and fear
-								emotion_caption = max(set(emotion_text), key=emotion_text.count)
-								if emotion_caption == "sad":
-									new_emotion = sad_list[sad_counter]
-									if sad_counter == len(sad_list)-1:
-										sad_counter = 0
-									else:
-										sad_counter+=1
-								elif emotion_caption == "happy":
-									new_emotion = happy_list[happy_counter]
-									if happy_counter == len(happy_list)-1:
-										happy_counter = 0
-									else:
-										happy_counter+=1
-								elif emotion_caption == "neutral":
-									new_emotion = neutral_list[neutral_counter]
-									if neutral_counter == len(neutral_list)-1:
-										neutral_counter = 0
-									else:
-										neutral_counter+=1
-								elif emotion_caption == "angry":
-									new_emotion = angry_list[angry_counter]
-									if angry_counter == len(angry_list)-1:
-										angry_counter = 0
-									else:
-										angry_counter+=1
-								elif emotion_caption == "fear":
-									new_emotion = fear_list[fear_counter]
-									if fear_counter == len(fear_list)-1:
-										fear_counter = 0
-									else:
-										fear_counter+=1
-								elif emotion_caption == "disgust":
-									new_emotion = disgust_list[disgust_counter]
-									if disgust_counter == len(disgust_list)-1:
-										disgust_counter = 0
-									else:
-										disgust_counter+=1
+									sad_counter+=1
+							elif emotion_caption == "happy":
+								new_emotion = happy_list[happy_counter]
+								if happy_counter == len(happy_list)-1:
+									happy_counter = 0
 								else:
-									new_emotion = surprise_list[surprise_counter]
-									if surprise_counter == len(surprise_list)-1:
-										surprise_counter = 0
-									else:
-										surprise_counter+=1
-								emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
-								if emotion_list_counter == len(emotion_list)-1:
-										emotion_list_counter = 0
+									happy_counter+=1
+							elif emotion_caption == "neutral":
+								new_emotion = neutral_list[neutral_counter]
+								if neutral_counter == len(neutral_list)-1:
+									neutral_counter = 0
 								else:
-									emotion_list_counter += 1
-								second_caption = "Person in " + shirt_list + " garment"
-								if max(set(wearing_glasses), key=wearing_glasses.count):
-									emotion_caption += " and bespeckled eyes"
-								pil_img = cv2.cvtColor(final_final_img,cv2.COLOR_BGR2RGB)
-								pilimg = Image.fromarray(pil_img)
-								draw = ImageDraw.Draw(pilimg)
-								draw.text((new_width * .18, new_width + (new_width * .07)), emotion_caption, (0,0,0), font=ft_bold)
-								draw.text((new_width * .18, new_width + (new_width * .14)), second_caption, (0,0,0), font=ft_color)
-								draw.text((new_width * .18, new_width + (new_width * .21)), "2019", (0,0,0), font=ft_color)
-								draw.text((new_width * .18, new_width + (new_width * .28)), "Collection of the artist", (0,0,0), font=ft_collection)
-								cv2img = cv2.cvtColor(np.array(pilimg),cv2.COLOR_RGB2BGR)
-								# save file to faces database
-								cv2.imwrite(fileName, cv2img)
-								# post to instagram
-								subprocess.call([r'C:/Users/gabeb/take-my-pic/insta.bat', fileName, emotion_caption])
-								# update instgram screen
-								insta_grid = gabe_flash()
-								gabe_flash_counter = 10
-								flash_done = False
-						
-								no_moments_counter = int(random.random() * 100 + 15)
-								# print(no_moments_counter)
-								tracking_faces = False
-			
-								test_pass = False
-								num_of_pics += 1
-								if num_of_pics >= 1:
-									looking_for_count += 1
-									if looking_for_count  >= len(looking_for):
-										looking_for_count = 0
-									num_of_pics = 0
-								# Reset everything
-								avg_counter = 0
-								emotion_text.clear()
-								wearing_glasses.clear()
-								shirt_color.clear()
-								gender_text.clear()
-								found_face = False
-								face_analyze = False
-								face_counter = 0
-						
-				# still looking for a face to focus on
-				else:	
-					np.random.shuffle(faces)
-					for (x,y,w,h) in faces: 
-						found_face = True;
-						face_x, face_y, face_w, face_h = x,y,w,h
-						break
+									neutral_counter+=1
+							elif emotion_caption == "angry":
+								new_emotion = angry_list[angry_counter]
+								if angry_counter == len(angry_list)-1:
+									angry_counter = 0
+								else:
+									angry_counter+=1
+							elif emotion_caption == "fear":
+								new_emotion = fear_list[fear_counter]
+								if fear_counter == len(fear_list)-1:
+									fear_counter = 0
+								else:
+									fear_counter+=1
+							elif emotion_caption == "disgust":
+								new_emotion = disgust_list[disgust_counter]
+								if disgust_counter == len(disgust_list)-1:
+									disgust_counter = 0
+								else:
+									disgust_counter+=1
+							else:
+								new_emotion = surprise_list[surprise_counter]
+								if surprise_counter == len(surprise_list)-1:
+									surprise_counter = 0
+								else:
+									surprise_counter+=1
+							emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
+							if emotion_list_counter == len(emotion_list)-1:
+									emotion_list_counter = 0
+							else:
+								emotion_list_counter += 1
+							second_caption = "Person in " + shirt_list + " garment"
+							if max(set(wearing_glasses), key=wearing_glasses.count):
+								emotion_caption += " and bespeckled eyes"
+							pil_img = cv2.cvtColor(final_final_img,cv2.COLOR_BGR2RGB)
+							pilimg = Image.fromarray(pil_img)
+							draw = ImageDraw.Draw(pilimg)
+							draw.text((new_width * .18, new_width + (new_width * .07)), emotion_caption, (0,0,0), font=ft_bold)
+							draw.text((new_width * .18, new_width + (new_width * .14)), second_caption, (0,0,0), font=ft_color)
+							draw.text((new_width * .18, new_width + (new_width * .21)), "2019", (0,0,0), font=ft_color)
+							draw.text((new_width * .18, new_width + (new_width * .28)), "Collection of the artist", (0,0,0), font=ft_collection)
+							cv2img = cv2.cvtColor(np.array(pilimg),cv2.COLOR_RGB2BGR)
+							# save file to faces database
+							cv2.imwrite(fileName, cv2img)
+							# post to instagram
+							subprocess.call([r"C:/Users/gabeb/Documents/take-my-pic/insta.bat", fileName, emotion_caption])
+					
+							no_moments_counter = int(random.random() * 100 + 15)
+							# print(no_moments_counter)
+							tracking_faces = False
+		
+							test_pass = False
+							num_of_pics += 1
+							if num_of_pics >= 1:
+								looking_for_count += 1
+								if looking_for_count  >= len(looking_for):
+									looking_for_count = 0
+								num_of_pics = 0
+							# Reset everything
+							avg_counter = 0
+							emotion_text.clear()
+							wearing_glasses.clear()
+							shirt_color.clear()
+							gender_text.clear()
+							found_face = False
+							face_analyze = False
+							face_counter = 0
+					
+			# still looking for a face to focus on
+			else:	
+				np.random.shuffle(faces)
+				for (x,y,w,h) in faces: 
+					found_face = True;
+					face_x, face_y, face_w, face_h = x,y,w,h
+					break
 
-			# flip insta grid 90 degrees
-			rotate_insta = imutils.rotate_bound(insta_grid,90)
-
-			cv2.imshow("test window", flipped)
-			cv2.imshow("insta", rotate_insta)
-			k = cv2.waitKey(30 & 0xff)
-			if k == 27: 	# press ESC to quit
-				break
+		cv2.imshow("test window", flipped)
+		k = cv2.waitKey(30 & 0xff)
+		if k == 27: 	# press ESC to quit
+			break
 
 
-async def init_main():
-
-	server = AsyncIOOSCUDPServer((ip,port), dispatcher, asyncio.get_event_loop())
-	transport, protocol = await server.create_serve_endpoint()
-
-	await loopFunc()
-
-	transport.close()
-
-
-	# # end of program
-	cam.release()
-	cv2.destroyAllWindows()
-
-
-loop = asyncio.get_event_loop()
-loop.run_until_complete(init_main())
+# # end of program
+cam.release()
+cv2.destroyAllWindows()
