@@ -78,6 +78,7 @@ gender_target_size = gender_classifier.input_shape[1:3]
 
 # OSC
 client = udp_client.UDPClient("127.0.0.1", 8001)
+client2 = udp_client.UDPClient("127.0.0.2", 8002)
 
 looking_for = ["glasses", "man", "woman", "light_shirt", "dark_shirt"]
 looking_for_count = 0
@@ -410,6 +411,11 @@ while(ret):
 							# post to instagram
 							subprocess.call([r"C:/Users/gabeb/Documents/take-my-pic/insta.bat", fileName, emotion_caption])
 					
+							# tell other computer
+							msg = osc_message_builder.OscMessageBuilder(address="/update_photo")
+							msg = msg.build()
+							client2.send(msg)
+
 							no_moments_counter = int(random.random() * 100 + 15)
 							# print(no_moments_counter)
 							tracking_faces = False
