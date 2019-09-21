@@ -5,6 +5,7 @@ import requests
 import cv2
 import glob
 import os
+import time
 import numpy as np
 
 # adding photo from other machine to our database
@@ -16,12 +17,13 @@ def add_new_photo():
 	soup = BeautifulSoup(driver.page_source, features="html5lib")
 
 	newest_img = soup.find_all('img')[1]
-	image_url = image['src']
-	img = Image.open(requests.get(image_url, stream = True).raw)
+	image_url = newest_img['src']
+	downloaded_img = Image.open(requests.get(image_url, stream = True).raw)
+	cv2img = cv2.cvtColor(np.array(downloaded_img),cv2.COLOR_RGB2BGR)
 	ts = time.gmtime()
 	timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
 	fileName = "../faces/face" + timestamp + ".png"
-	cv2.imwrite(fileName, img)
+	cv2.imwrite(fileName, cv2img)
 
 	# no longer need insta
 	driver.quit()
@@ -66,3 +68,6 @@ def update_screen():
 	final_img = np.concatenate((padded_recent_img, grid_images), axis=0)
 
 	return final_img	
+
+
+	

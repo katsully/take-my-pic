@@ -5,7 +5,9 @@ import dlib
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
 from pythonosc import dispatcher
-from pythonosc import osc_server
+# from pythonosc import osc_server
+from pythonosc.osc_server import AsyncIOOSCUDPServer
+import asyncio
 import subprocess
 import time
 from imutils import face_utils
@@ -25,21 +27,34 @@ from utils.kats_helper import hsv_to_rgb
 from utils.kats_helper import ColorNames
 from utils.kats_helper import resizeAndPad
 from InstaScreen import update_screen
-from InstaScreen import update_screen
+from InstaScreen import add_new_photo
 
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-# new photo from other avatar
-dispatcher = dispatcher.Dispatcher()
-dispatcher.map("/update_photo", avatar2_photo)
 
-server = osc_server.ThreadOSCUSPServer(("127.0.0.1", 8002), dispatcher)
-server.serve_forever()
 
-def avatar2_photo:
-	insta_grid = add_new_photo()
+# # new photo from other avatar
+# def avatar2_photo(*params):
+# 	print("heard ya!")
+# 	insta_grid = add_new_photo()
+
+# dispatcher = dispatcher.Dispatcher()
+# dispatcher.map("/update_photo", avatar2_photo)
+
+# ip = "127.0.0.1"
+# port = 8002
+
+# async def loop():
+# 	await syncio.sleep(0)
+
+# async def init_main():
+
+	# server = AsyncIOOSCUDPServer((ip,port), dispatcher, asyncio.get_event_loop())
+	# transport, protocol = await server.create_serve_endpoint()
+
+	# await loop()
 
 cam = cv2.VideoCapture(0)
 cam.set(3,1920)	# width
@@ -222,7 +237,7 @@ while(ret):
 							face_analyze = True
 				# we're ready to analyze this face!
 				if face_analyze:
-					print("analyzing face!")
+					# print("analyzing face!")
 					x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
 					gray_face_og = gray_img[y1:y2, x1:x2]
 					x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), gender_offsets)
@@ -476,7 +491,8 @@ while(ret):
 	k = cv2.waitKey(30 & 0xff)
 	if k == 27: 	# press ESC to quit
 		break
- 
+
 # # end of program
 cam.release()
 cv2.destroyAllWindows()
+
