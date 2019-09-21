@@ -12,13 +12,17 @@ import numpy as np
 def add_new_photo():
 	url = 'http://instagram.com/lookingtogether/'
 	driver = webdriver.Chrome()
+	print("made driver")
 	driver.get(url)
+	print("get url")
 
 	soup = BeautifulSoup(driver.page_source, features="html5lib")
+	print("made soup")
 
 	newest_img = soup.find_all('img')[1]
 	image_url = newest_img['src']
 	downloaded_img = Image.open(requests.get(image_url, stream = True).raw)
+	print("downloaded image")
 	cv2img = cv2.cvtColor(np.array(downloaded_img),cv2.COLOR_RGB2BGR)
 	ts = time.gmtime()
 	timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
@@ -29,6 +33,10 @@ def add_new_photo():
 	driver.quit()
 
 	return update_screen()
+
+def gabe_flash():
+
+	return 255 * np.ones(shape=[1080, 1920, 3], dtype=np.uint8)
 
 
 def update_screen():
