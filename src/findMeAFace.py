@@ -36,7 +36,7 @@ def moments_enabled(send_zero):
 
 cam = cv2.VideoCapture(0)
 cv2.namedWindow("insta", flags=cv2.WND_PROP_FULLSCREEN)
-cv2.moveWindow("insta", 0, 0)
+cv2.moveWindow("insta", 2160, 0)
 cv2.setWindowProperty("insta", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 
@@ -158,7 +158,7 @@ while(ret):
 		moments_enabled(0)
 	else:
 		if flash_done == True:
-			rand_num = random.randint(84,114)
+			rand_num = random.randint(54,84)
 			t_end = time.time() + rand_num
 			tell_matt = time.time() + (rand_num * .8)
 			while time.time() < t_end:
@@ -261,7 +261,7 @@ while(ret):
 						landmarks = landmarks_to_np(landmarks)
 						LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
 						aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
-						print(judge_eyeglass(aligned_face))
+						# print(judge_eyeglass(aligned_face))
 						wearing_glasses.append(judge_eyeglass(aligned_face))
 
 						avg_counter += 1
@@ -297,11 +297,11 @@ while(ret):
 							avg_h, avg_s, avg_v = rgb_to_hsv(avg_r, avg_g, avg_b)
 							
 							# up the saturation and brightness
-							avg_s += .2
+							avg_s += avg_s * .2
 							avg_v += avg_v * .12
 
 							new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
-							# print("new averages", new_r, new_g, new_b)
+							print("new averages", new_r, new_g, new_b)
 							color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
 							shirt_color.append(color_name)
 
