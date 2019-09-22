@@ -174,7 +174,7 @@ async def loopFunc():
 		msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
 		if tracking_faces:
 			msg.add_arg(0)
-			msg.build()
+			msg = msg.build()
 			client.send(msg)
 			await asyncio.sleep(0)
 		else:
