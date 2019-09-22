@@ -38,7 +38,7 @@ from PIL import ImageFont
 # new photo from other avatar
 def avatar2_photo(*params):
 	global insta_grid
-	print("heard ya!")
+	# print("heard ya!")
 	insta_grid = add_new_photo()
 
 dispatcher = dispatcher.Dispatcher()
@@ -51,9 +51,9 @@ port = 8002
 cam = cv2.VideoCapture(0)
 insta_grid = np.zeros((500,500,3), np.uint8)
 
-cv2.namedWindow("insta", flags=cv2.WND_PROP_FULLSCREEN)
+cv2.namedWindow("insta" , flags=cv2.WND_PROP_FULLSCREEN)
 cv2.setWindowProperty("insta", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-cv2.moveWindow("insta", 1920, 0)
+cv2.moveWindow("insta", 2160, 0)
 
 
 async def loopFunc():
@@ -74,7 +74,7 @@ async def loopFunc():
 	predictor = dlib.shape_predictor(predictor_path)
 
 	# build udp_client for osc protocol
-	client = udp_client.UDPClient("", 8001)
+	client = udp_client.UDPClient("127.0.0.1", 8001)
 	# counter for collecting the avg info about a person
 	avg_counter = 0
 	face_counter = 0
@@ -170,22 +170,30 @@ async def loopFunc():
 	    ret = False
 
 	while(ret):
-		await asyncio.sleep(0)
 		# moments to Matt
 		msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
 		if tracking_faces:
 			msg.add_arg(0)
+			msg.build()
+			client.send(msg)
+			await asyncio.sleep(0)
 		else:
-			msg.add_arg(1)
-			no_moments_counter -= 1
-			gabe_flash_counter -= 1
-			if no_moments_counter == 0:
-				tracking_faces = True
-			if gabe_flash_counter == 0 and flash_done == False:
-				insta_grid = update_screen()
-				flash_done = True
-		msg = msg.build()
-		client.send(msg)
+			rand_num = random.randint(90,120)
+			t_end = time.time() + rand_num
+			tell_matt = time.time() + (rand_num * .8)
+			while time.time() < t_end:
+				await asyncio.sleep(0)
+				arg = 1
+				if time.time() > tell_matt:
+					arg = 0
+				msg.add_arg(arg)
+				msg = msg.build()
+				client.send(msg)
+				gabe_flash_counter -=1
+				if flash_done == False and gabe_flash_counter == 0:
+					insta_grid = update_screen()
+					flash_done = True
+			tracking_faces = True
 
 		if tracking_faces:
 			ret, img = cam.read()
@@ -312,7 +320,7 @@ async def loopFunc():
 								avg_v += avg_v * .12
 
 								new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
-								print("new averages", new_r, new_g, new_b)
+								# print("new averages", new_r, new_g, new_b)
 								# cv2.rectangle(flipped,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
 								color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
 								shirt_color.append(color_name)
@@ -453,7 +461,7 @@ async def loopFunc():
 								gabe_flash_counter = 10
 								flash_done = False
 						
-								no_moments_counter = int(random.random() * 100 + 15)
+								# no_moments_counter = random.randit(1000,2000)
 								# print(no_moments_counter)
 								tracking_faces = False
 			
@@ -485,7 +493,7 @@ async def loopFunc():
 			# flip insta grid 90 degrees
 			rotate_insta = imutils.rotate_bound(insta_grid,90)
 
-			cv2.imshow("test window", flipped)
+			# cv2.imshow("test window", flipped)
 			cv2.imshow("insta", rotate_insta)
 			k = cv2.waitKey(30 & 0xff)
 			if k == 27: 	# press ESC to quit
