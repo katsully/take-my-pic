@@ -26,7 +26,7 @@ def get_centers(img, landmarks):
     x = ((landmarks[0:4]).T)[0]
     y = ((landmarks[0:4]).T)[1]
     A = np.vstack([x, np.ones(len(x))]).T
-    k, b = np.linalg.lstsq(A, y, rcond=None)[0]
+    k, b = np.linalg.lstsq(A, y, rcond=-1)[0]
     
     x_left = (EYE_LEFT_OUTTER[0]+EYE_LEFT_INNER[0])/2
     x_right = (EYE_RIGHT_OUTTER[0]+EYE_RIGHT_INNER[0])/2
@@ -97,7 +97,7 @@ def judge_eyeglass(img):
    
     # Determine the discriminant value based on the relationship 
     # between the evaluation value and the threshold
-    if measure > 0.25:
+    if measure > 0.15:
         judge = True
     else:
         judge = False

@@ -37,9 +37,8 @@ def moments_enabled(send_zero):
 
 cam = cv2.VideoCapture(0)
 cv2.namedWindow("insta", flags=cv2.WND_PROP_FULLSCREEN)
-cv2.moveWindow("insta", 2160, 0)
+cv2.moveWindow("insta", 0, 0)
 cv2.setWindowProperty("insta", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
 
 
 cam.set(3,1920)	# width
@@ -258,13 +257,13 @@ while(ret):
 
 						# eyeglasses
 						# TODO: FIX THIS
-						# rect = dlib.rectangle(face_x, face_y, face_x+face_w, face_y+face_h)
-						# landmarks = predictor(gray_img, rect)
-						# landmarks = landmarks_to_np(landmarks)
-						# LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
-						# aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
-						# wearing_glasses.append(judge_eyeglass(aligned_face))
-						wearing_glasses.append(False)
+						rect = dlib.rectangle(face_x, face_y, face_x+face_w, face_y+face_h)
+						landmarks = predictor(gray_img, rect)
+						landmarks = landmarks_to_np(landmarks)
+						LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
+						aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
+						print(judge_eyeglass(aligned_face))
+						wearing_glasses.append(judge_eyeglass(aligned_face))
 
 						avg_counter += 1
 
@@ -425,7 +424,7 @@ while(ret):
 								emotion_list_counter += 1
 							second_caption = "Person in " + shirt_list + " garment"
 							if max(set(wearing_glasses), key=wearing_glasses.count):
-								emotion_caption += " and bespeckled eyes"
+								second_caption += " and low vision"
 							pil_img = cv2.cvtColor(final_final_img,cv2.COLOR_BGR2RGB)
 							pilimg = Image.fromarray(pil_img)
 							draw = ImageDraw.Draw(pilimg)
