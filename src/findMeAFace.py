@@ -146,6 +146,8 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 # pull up instagram screen
 insta_grid = update_screen()
 
+flash_pause_timer = 10
+
 if cam.isOpened(): # try to get the first frame
 	ret, img = cam.read()	
 else:
@@ -158,7 +160,7 @@ while(ret):
 		moments_enabled(0)
 	else:
 		if flash_done == True:
-			rand_num = random.randint(54,84)
+			rand_num = random.randint(60-flash_pause_timer,90-flash_pause_timer)
 			t_end = time.time() + rand_num
 			tell_matt = time.time() + (rand_num * .8)
 			while time.time() < t_end:
@@ -168,7 +170,7 @@ while(ret):
 				moments_enabled(arg)
 			tracking_faces = True	
 		else:
-			t_update_insta = time.time() + 6
+			t_update_insta = time.time() + flash_pause_timer
 			if flash_pause:
 				while time.time() < t_update_insta:
 					moments_enabled(1)
@@ -281,7 +283,11 @@ while(ret):
 						shirt_region = rgb_img[s_y:int(s_y2), x1:x2]
 
 						if type(shirt_region) is not 'NoneType':
-							shirt_image = Image.fromarray(shirt_region, 'RGB')
+							try:
+								shirt_image = Image.fromarray(shirt_region, 'RGB')
+							except Image.error as e:
+								print(e)
+								continue
 							hist = shirt_image.histogram()
 							# split into red, green, blue
 							r = hist[0:256]
