@@ -1,46 +1,15 @@
-from bs4 import BeautifulSoup
-import selenium.webdriver as webdriver
 from PIL import Image
-import requests
 import cv2
 import glob
 import os
 import time
 import numpy as np
 
-# adding photo from other machine to our database
-def add_new_photo():
-	url = 'http://instagram.com/lookingtogether/'
-	driver = webdriver.Chrome()
-	print("made driver")
-	driver.get(url)
-	print("get url")
-
-	soup = BeautifulSoup(driver.page_source, features="html5lib")
-	print("made soup")
-
-	newest_img = soup.find_all('img')[1]
-	image_url = newest_img['src']
-	downloaded_img = Image.open(requests.get(image_url, stream = True).raw)
-	print("downloaded image")
-	cv2img = cv2.cvtColor(np.array(downloaded_img),cv2.COLOR_RGB2BGR)
-	ts = time.gmtime()
-	timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
-	fileName = "../faces/face" + timestamp + ".png"
-	cv2.imwrite(fileName, cv2img)
-
-	# no longer need insta
-	driver.quit()
-
-	return update_screen()
-
 def gabe_flash():
-
 	return 255 * np.ones(shape=[1080, 1920, 3], dtype=np.uint8)
 
 
 def update_screen():
-	# cv2.destroyAllWindows()
 	all_photos = glob.glob('../faces/*')
 	most_recent = max(all_photos, key=os.path.getctime)
 	recent_image = cv2.imread(most_recent)
