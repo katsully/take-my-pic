@@ -4,7 +4,6 @@ import numpy as np
 import dlib
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
-import asyncio
 import subprocess
 import time
 from imutils import face_utils
