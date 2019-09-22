@@ -43,8 +43,6 @@ predictor_path = "../data/shape_predictor_5_face_landmarks.dat"
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(predictor_path)
 
-# build udp_client for osc protocol
-client = udp_client.UDPClient("", 8001)
 # counter for collecting the avg info about a person
 avg_counter = 0
 face_counter = 0
@@ -78,7 +76,7 @@ gender_target_size = gender_classifier.input_shape[1:3]
 
 # OSC
 client = udp_client.UDPClient("127.0.0.1", 8001)
-client2 = udp_client.UDPClient("127.0.0.2", 8002)
+client2 = udp_client.UDPClient("10.18.73.40", 8002)
 
 looking_for = ["glasses", "man", "woman", "light_shirt", "dark_shirt"]
 looking_for_count = 0
@@ -139,16 +137,25 @@ else:
 
 while(ret):
 	# moments to Matt
-	msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
 	if tracking_faces:
+		msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
 		msg.add_arg(0)
+		msg = msg.build()
+		client.send(msg)
+		# print("moments enabled")
 	else:
-		msg.add_arg(1)
-		no_moments_counter -= 1
-		if no_moments_counter == 0:
-			tracking_faces = True
-	msg = msg.build()
-	client.send(msg)
+		rand_num = random.randint(90, 120)
+		t_end = time.time() + rand_num
+		tell_matt = time.time() + (rand_num * .8)
+		while time.time() < t_end:
+			msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
+			arg = 1
+			if time.time() > tell_matt:
+				arg = 0
+			msg.add_arg(arg)
+			msg = msg.build()
+			client.send(msg)
+		tracking_faces = True				
 
 	if tracking_faces:
 		ret, img = cam.read()
@@ -274,7 +281,7 @@ while(ret):
 							avg_v += avg_v * .12
 
 							new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
-							print("new averages", new_r, new_g, new_b)
+							# print("new averages", new_r, new_g, new_b)
 							# cv2.rectangle(flipped,(face_x,s_y), (face_x+face_w, s_y+face_h), (0,255,0), 2)
 							color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
 							shirt_color.append(color_name)
@@ -409,15 +416,15 @@ while(ret):
 							# save file to faces database
 							cv2.imwrite(fileName, cv2img)
 							# post to instagram
-							subprocess.call([r"C:/Users/gabeb/Documents/take-my-pic/insta.bat", fileName, emotion_caption])
+							subprocess.call([r"C:/Users/gabeb/take-my-pic/insta.bat", fileName, emotion_caption])
 					
 							# tell other computer
 							msg = osc_message_builder.OscMessageBuilder(address="/update_photo")
 							msg = msg.build()
 							client2.send(msg)
 
-							no_moments_counter = int(random.random() * 100 + 15)
-							# print(no_moments_counter)
+							# no_moments_counter = random.randint(1000,2000)
+							# print("START TIMER", no_moments_counter)
 							tracking_faces = False
 		
 							test_pass = False
@@ -445,7 +452,7 @@ while(ret):
 					face_x, face_y, face_w, face_h = x,y,w,h
 					break
 
-		cv2.imshow("test window", flipped)
+		# cv2.imshow("test window", flipped)
 		k = cv2.waitKey(30 & 0xff)
 		if k == 27: 	# press ESC to quit
 			break
