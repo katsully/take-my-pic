@@ -253,9 +253,9 @@ while(ret):
 						# ensure shirt region doesn't extend outside of image
 						rgb_height, rgb_width = rgb_img.shape[:2]
 						if x2 >= rgb_width:
-							x2 = rgb_width -1
+							x2 = rgb_width -2
 						if s_y2 >= rgb_height:
-							s_y2 = rgb_height -1
+							s_y2 = rgb_height -2
 						if x1 < 0:
 							x1 = 0
 						shirt_region = rgb_img[s_y:int(s_y2), x1:x2]
