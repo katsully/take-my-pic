@@ -97,7 +97,7 @@ def judge_eyeglass(img):
    
     # Determine the discriminant value based on the relationship 
     # between the evaluation value and the threshold
-    if measure > 0.15:
+    if measure > 0.18:
         judge = True
     else:
         judge = False

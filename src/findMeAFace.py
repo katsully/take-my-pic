@@ -434,8 +434,13 @@ while(ret):
 							cv2img = cv2.cvtColor(np.array(pilimg),cv2.COLOR_RGB2BGR)
 							# save file to faces database
 							cv2.imwrite(fileName, cv2img)
+							
 							# post to instagram
-							subprocess.call([r'C:/Users/gabeb/take-my-pic/insta.bat', fileName, emotion_caption])
+							try:
+								subprocess.call([r'C:/Users/gabeb/take-my-pic/insta.bat', fileName, emotion_caption])
+							except subprocess.CalledProcessError as e:
+								print(e.output)
+							
 							flash_done = False
 							gabe_flash_counter = 12
 							flash_pause = True
