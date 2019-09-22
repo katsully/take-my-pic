@@ -480,4 +480,3 @@ while(ret):
 # end of program
 cam.release()
 cv2.destroyAllWindows()
->>>>>>> machine2
