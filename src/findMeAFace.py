@@ -24,7 +24,6 @@ from utils.kats_helper import ColorNames
 from InstaScreen import gabe_flash
 from InstaScreen import update_screen
 
-
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
@@ -98,9 +97,9 @@ num_of_pics = 0
 test_pass = False
 
 # font
-ft_bold = ImageFont.truetype(font="NewsGothicStd-BoldOblique.otf",size=40)
-ft_color = ImageFont.truetype(font="News Gothic Regular.otf",size=32)
-ft_collection = ImageFont.truetype(font="News Gothic Regular.otf",size=18)
+ft_bold = ImageFont.truetype(font="fonts/NewsGothicStd-BoldOblique.otf",size=40)
+ft_color = ImageFont.truetype(font="fonts/News Gothic Regular.otf",size=32)
+ft_collection = ImageFont.truetype(font="fonts/News Gothic Regular.otf",size=18)
 
 # captions
 text_file = open("emotions.txt", "r")

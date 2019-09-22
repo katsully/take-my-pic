@@ -5,6 +5,12 @@ import os
 import time
 import numpy as np
 
+from PIL import ImageFont
+from PIL import Image
+from PIL import ImageDraw
+
+insta_font = ImageFont.truetype(font="fonts/Mark Simonson Proxima Nova Light.otf",size=60)
+
 def gabe_flash():
 	return 255 * np.ones(shape=[1080, 1920, 3], dtype=np.uint8)
 
@@ -42,7 +48,17 @@ def update_screen():
 
 	
 	final_img = np.concatenate((padded_recent_img, grid_img), axis=0)
-	final_img = cv2.line(final_img, (0,int(1920*.78)), (1080,int(1920*.78)), (200,200,200), 2) 
+
+	# write instagram caption
+	pil_img = cv2.cvtColor(final_img,cv2.COLOR_BGR2RGB)
+	pilimg = Image.fromarray(pil_img)
+	draw = ImageDraw.Draw(pilimg)
+	insta_account = "lookingtogether"
+	text_length = insta_font.getsize(insta_account)[0]
+	draw.text((1080/2 - text_length/2, 1920*.04), insta_account, (0,0,0), font=insta_font)
+	cv2img = cv2.cvtColor(np.array(pilimg),cv2.COLOR_RGB2BGR)
+
+	final_img = cv2.line(cv2img, (0,int(1920*.78)), (1080,int(1920*.78)), (200,200,200), 2) 
 
 	return final_img	
 
