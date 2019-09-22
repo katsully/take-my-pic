@@ -11,8 +11,9 @@ def gabe_flash():
 
 def update_screen():
 	all_photos = glob.glob('../faces/*')
-	most_recent = max(all_photos, key=os.path.getctime)
-	recent_image = cv2.imread(most_recent)
+	all_photos.sort(key=os.path.getmtime)
+	# most_recent = max(all_photos, key=os.path.getctime)
+	recent_image = cv2.imread(all_photos[-1])
 	h, w = recent_image.shape[:2]
 	cropped = recent_image[0:h,int(w*.08):int(w*.92)]
 	c_h, c_w = cropped.shape[:2]
@@ -23,7 +24,7 @@ def update_screen():
 	smaller_pic_size = int(1080/3)
 	resized_pics = []
 	for i in range(3):
-		pic = cv2.imread(all_photos[i+1])
+		pic = cv2.imread(all_photos[-i-2])
 		pic = cv2.copyMakeBorder(pic, 0, int(1080*.1), 0, 0, borderType=cv2.BORDER_CONSTANT, value=(255,255,255))
 		resized_pics.append(cv2.resize(pic, (smaller_pic_size, smaller_pic_size)))
 	
