@@ -24,6 +24,7 @@ from utils.kats_helper import ColorNames
 from InstaScreen import gabe_flash
 from InstaScreen import update_screen
 
+
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
@@ -35,8 +36,6 @@ def moments_enabled(send_zero):
 	client.send(msg)
 
 cam = cv2.VideoCapture(0)
-insta_grid = np.zeros((500,500,3), np.uint8)
-
 cv2.namedWindow("insta", flags=cv2.WND_PROP_FULLSCREEN)
 cv2.moveWindow("insta", 2160, 0)
 cv2.setWindowProperty("insta", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -59,6 +58,7 @@ predictor = dlib.shape_predictor(predictor_path)
 
 # build udp_client for osc protocol
 client = udp_client.UDPClient("127.0.0.1", 8001)
+
 # counter for collecting the avg info about a person
 avg_counter = 0
 face_counter = 0
@@ -138,9 +138,9 @@ fear_counter = 0
 new_emotion=""
 
 tracking_faces = True
-no_moments_counter = 0
 gabe_flash_counter = 0
 flash_done = False
+
 
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
@@ -180,7 +180,6 @@ while(ret):
 			if gabe_flash_counter == 0:
 				insta_grid = update_screen()
 				flash_done = True
-
 	if tracking_faces:
 		# flip camera 90 degrees
 		rotate = imutils.rotate_bound(img, 90)
@@ -477,6 +476,8 @@ while(ret):
 	if k == 27: 	# press ESC to quit
 		break
 
+
 # end of program
 cam.release()
 cv2.destroyAllWindows()
+>>>>>>> machine2
