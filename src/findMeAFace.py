@@ -15,9 +15,9 @@ from utils.datasets import get_labels
 from utils.inference import apply_offsets
 from utils.preprocessor import preprocess_input
 from utils.kats_helper import landmarks_to_np
-from utils.kats_helper import get_centers
-from utils.kats_helper import get_aligned_face
-from utils.kats_helper import judge_eyeglass
+# from utils.kats_helper import get_centers
+# from utils.kats_helper import get_aligned_face
+# from utils.kats_helper import judge_eyeglass
 from utils.kats_helper import rgb_to_hsv
 from utils.kats_helper import hsv_to_rgb
 from utils.kats_helper import ColorNames
@@ -50,9 +50,9 @@ gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
 gender_labels = get_labels('imdb')
 
 # eyeglasses
-predictor_path = "../data/shape_predictor_5_face_landmarks.dat"
-detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(predictor_path)
+# predictor_path = "../data/shape_predictor_5_face_landmarks.dat"
+# detector = dlib.get_frontal_face_detector()
+# predictor = dlib.shape_predictor(predictor_path)
 
 # build udp_client for osc protocol
 client = udp_client.UDPClient("127.0.0.1", 8001)
@@ -62,7 +62,7 @@ avg_counter = 0
 face_counter = 0
 emotion_text = []
 gender_text = []
-wearing_glasses = []
+# wearing_glasses = []
 shirt_color = []
 found_face = False;
 face_x = 0
@@ -91,10 +91,10 @@ gender_target_size = gender_classifier.input_shape[1:3]
 # OSC
 client = udp_client.UDPClient("127.0.0.1", 8001)
 
-looking_for = ["glasses", "man", "woman", "light_shirt", "dark_shirt"]
-looking_for_count = 0
-num_of_pics = 0
-test_pass = False
+# looking_for = ["glasses", "man", "woman", "light_shirt", "dark_shirt"]
+# looking_for_count = 0
+# num_of_pics = 0
+# test_pass = False
 
 # font
 ft_bold = ImageFont.truetype(font="fonts/NewsGothicStd-BoldOblique.otf",size=40)
@@ -146,7 +146,7 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 # pull up instagram screen
 insta_grid = update_screen()
 
-flash_pause_timer = 10
+flash_pause_timer = 11
 
 if cam.isOpened(): # try to get the first frame
 	ret, img = cam.read()	
@@ -160,9 +160,9 @@ while(ret):
 		moments_enabled(0)
 	else:
 		if flash_done == True:
-			rand_num = random.randint(60-flash_pause_timer,90-flash_pause_timer)
+			rand_num = random.randint(80-flash_pause_timer,100-flash_pause_timer)
 			t_end = time.time() + rand_num
-			tell_matt = time.time() + (rand_num * .8)
+			tell_matt = time.time() + (rand_num * .7)
 			while time.time() < t_end:
 				arg = 1
 				if time.time() > tell_matt:
@@ -203,7 +203,7 @@ while(ret):
 			avg_counter = 0
 			emotion_text.clear()
 			gender_text.clear()
-			wearing_glasses.clear()
+			# wearing_glasses.clear()
 			shirt_color.clear()
 
 		# camera found one or more faces
@@ -222,7 +222,7 @@ while(ret):
 					emotion_text.clear()
 					shirt_color.clear()
 					gender_text.clear()
-					wearing_glasses.clear()
+					# wearing_glasses.clear()
 				# face is still there
 				else:
 					# if we're still determining this face isn't someone quickly entering and exiting
@@ -258,13 +258,13 @@ while(ret):
 
 						# eyeglasses
 						# TODO: FIX THIS
-						rect = dlib.rectangle(face_x, face_y, face_x+face_w, face_y+face_h)
-						landmarks = predictor(gray_img, rect)
-						landmarks = landmarks_to_np(landmarks)
-						LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
-						aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
-						# print(judge_eyeglass(aligned_face))
-						wearing_glasses.append(judge_eyeglass(aligned_face))
+						# rect = dlib.rectangle(face_x, face_y, face_x+face_w, face_y+face_h)
+						# landmarks = predictor(gray_img, rect)
+						# landmarks = landmarks_to_np(landmarks)
+						# LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
+						# aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
+						# # print(judge_eyeglass(aligned_face))
+						# wearing_glasses.append(judge_eyeglass(aligned_face))
 
 						avg_counter += 1
 
@@ -428,8 +428,8 @@ while(ret):
 							else:
 								emotion_list_counter += 1
 							second_caption = "Person in " + shirt_list + " garment"
-							if max(set(wearing_glasses), key=wearing_glasses.count):
-								second_caption += " and low vision"
+							# if max(set(wearing_glasses), key=wearing_glasses.count):
+							# 	second_caption += " and low vision"
 							pil_img = cv2.cvtColor(final_final_img,cv2.COLOR_BGR2RGB)
 							pilimg = Image.fromarray(pil_img)
 							draw = ImageDraw.Draw(pilimg)
@@ -452,17 +452,17 @@ while(ret):
 							flash_pause = True
 							tracking_faces = False
 		
-							test_pass = False
-							num_of_pics += 1
-							if num_of_pics >= 1:
-								looking_for_count += 1
-								if looking_for_count  >= len(looking_for):
-									looking_for_count = 0
-								num_of_pics = 0
+							# test_pass = False
+							# num_of_pics += 1
+							# if num_of_pics >= 1:
+							# 	looking_for_count += 1
+							# 	if looking_for_count  >= len(looking_for):
+							# 		looking_for_count = 0
+							# 	num_of_pics = 0
 							# Reset everything
 							avg_counter = 0
 							emotion_text.clear()
-							wearing_glasses.clear()
+							# wearing_glasses.clear()
 							shirt_color.clear()
 							gender_text.clear()
 							found_face = False
