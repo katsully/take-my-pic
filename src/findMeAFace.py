@@ -102,7 +102,7 @@ ft_color = ImageFont.truetype(font="fonts/News Gothic Regular.otf",size=32)
 ft_collection = ImageFont.truetype(font="fonts/News Gothic Regular.otf",size=18)
 
 # captions
-text_file = open("emotions.txt", "r")
+text_file = open("emotions2.txt", "r")
 emotion_list = [line.rstrip() for line in text_file.readlines()]
 emotion_list_counter = 0
 angry_file = open("anger.txt", "r")
@@ -146,7 +146,10 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 # pull up instagram screen
 insta_grid = update_screen()
 
-flash_pause_timer = 11
+flash_pause_timer = 10
+
+second_caption_titles = ["Subject in ", "Figure in ", "A Study in ", "Portrait in ", "A Variation in "]
+second_caption_counter = 0 
 
 if cam.isOpened(): # try to get the first frame
 	ret, img = cam.read()	
@@ -160,7 +163,7 @@ while(ret):
 		moments_enabled(0)
 	else:
 		if flash_done == True:
-			rand_num = random.randint(80-flash_pause_timer,100-flash_pause_timer)
+			rand_num = random.randint(60-flash_pause_timer,90-flash_pause_timer)
 			t_end = time.time() + rand_num
 			tell_matt = time.time() + (rand_num * .7)
 			while time.time() < t_end:
@@ -285,8 +288,8 @@ while(ret):
 						if type(shirt_region) is not 'NoneType':
 							try:
 								shirt_image = Image.fromarray(shirt_region, 'RGB')
-							except Image.error as e:
-								print(e)
+							except: 
+								print("shirt error")
 								continue
 							hist = shirt_image.histogram()
 							# split into red, green, blue
@@ -307,7 +310,7 @@ while(ret):
 							avg_v += avg_v * .12
 
 							new_r, new_g, new_b = hsv_to_rgb(avg_h, avg_s, avg_v)
-							print("new averages", new_r, new_g, new_b)
+							# print("new averages", new_r, new_g, new_b)
 							color_name = ColorNames.findNearestImageMagickColorName((int(new_r),int(new_g),int(new_b)))
 							shirt_color.append(color_name)
 
@@ -427,7 +430,11 @@ while(ret):
 									emotion_list_counter = 0
 							else:
 								emotion_list_counter += 1
-							second_caption = "Person in " + shirt_list + " garment"
+							second_caption = second_caption_titles[second_caption_counter] + shirt_list 
+							if second_caption_counter == len(second_caption_titles)-1:
+									second_caption_counter = 0
+							else:
+								second_caption_counter += 1
 							# if max(set(wearing_glasses), key=wearing_glasses.count):
 							# 	second_caption += " and low vision"
 							pil_img = cv2.cvtColor(final_final_img,cv2.COLOR_BGR2RGB)
