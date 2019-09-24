@@ -53,7 +53,7 @@ def update_screen():
 	pil_img = cv2.cvtColor(final_img,cv2.COLOR_BGR2RGB)
 	pilimg = Image.fromarray(pil_img)
 	draw = ImageDraw.Draw(pilimg)
-	insta_account = "lookingtogether"
+	insta_account = "thecollectorsgallery"
 	text_length = insta_font.getsize(insta_account)[0]
 	draw.text((1080/2 - text_length/2, 1920*.04), insta_account, (0,0,0), font=insta_font)
 	cv2img = cv2.cvtColor(np.array(pilimg),cv2.COLOR_RGB2BGR)
