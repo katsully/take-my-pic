@@ -94,7 +94,7 @@ ft_color = ImageFont.truetype(font="fonts/News Gothic Regular.otf",size=32)
 ft_collection = ImageFont.truetype(font="fonts/News Gothic Regular.otf",size=18)
 
 # captions
-text_file = open("emotions1.txt", "r")
+text_file = open("emotions2.txt", "r")
 emotion_list = [line.rstrip() for line in text_file.readlines()]
 emotion_list_counter = 0
 angry_file = open("anger.txt", "r")
@@ -138,7 +138,7 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 # pull up instagram screen
 insta_grid = update_screen()
 
-flash_pause_timer = 11
+flash_pause_timer = 10
 
 second_caption_titles = ["Subject in ", "Figure in ", "A Study in ", "Portrait in ", "A Variation in "]
 second_caption_counter = 0 
@@ -155,7 +155,7 @@ while(ret):
 		moments_enabled(0)
 	else:
 		if flash_done == True:
-			rand_num = random.randint(80-flash_pause_timer,100-flash_pause_timer)
+			rand_num = random.randint(60-flash_pause_timer,90-flash_pause_timer)
 			t_end = time.time() + rand_num
 			tell_matt = time.time() + (rand_num * .7)
 			while time.time() < t_end:
