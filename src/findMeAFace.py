@@ -10,6 +10,8 @@ from imutils import face_utils
 import imutils
 import random
 import re
+from instapy_cli import client
+from instagram_private_api import ClientError
 
 from utils.datasets import get_labels
 from utils.inference import apply_offsets
@@ -32,7 +34,11 @@ def moments_enabled(send_zero):
 	msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
 	msg.add_arg(send_zero)
 	msg = msg.build()
-	client.send(msg)
+	osc_client.send(msg)
+
+# for instagram
+username = 'thecollectorsgallery'
+password = 'lookyloo'
 
 cam = cv2.VideoCapture(0)
 cv2.namedWindow("insta", flags=cv2.WND_PROP_FULLSCREEN)
@@ -49,20 +55,14 @@ emotion_labels = get_labels('fer2013')
 gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
 gender_labels = get_labels('imdb')
 
-# eyeglasses
-# predictor_path = "../data/shape_predictor_5_face_landmarks.dat"
-# detector = dlib.get_frontal_face_detector()
-# predictor = dlib.shape_predictor(predictor_path)
-
 # build udp_client for osc protocol
-client = udp_client.UDPClient("127.0.0.1", 8001)
+osc_client = udp_client.UDPClient("127.0.0.1", 8001)
 
 # counter for collecting the avg info about a person
 avg_counter = 0
 face_counter = 0
 emotion_text = []
 gender_text = []
-# wearing_glasses = []
 shirt_color = []
 found_face = False;
 face_x = 0
@@ -87,14 +87,6 @@ gender_classifier = load_model(gender_model_path, compile=False)
 # getting input model shapes for inference
 emotion_target_size = emotion_classifier.input_shape[1:3]
 gender_target_size = gender_classifier.input_shape[1:3]
-
-# OSC
-client = udp_client.UDPClient("127.0.0.1", 8001)
-
-# looking_for = ["glasses", "man", "woman", "light_shirt", "dark_shirt"]
-# looking_for_count = 0
-# num_of_pics = 0
-# test_pass = False
 
 # font
 ft_bold = ImageFont.truetype(font="fonts/NewsGothicStd-BoldOblique.otf",size=40)
@@ -225,7 +217,6 @@ while(ret):
 					emotion_text.clear()
 					shirt_color.clear()
 					gender_text.clear()
-					# wearing_glasses.clear()
 				# face is still there
 				else:
 					# if we're still determining this face isn't someone quickly entering and exiting
@@ -258,16 +249,6 @@ while(ret):
 						gender_prediction = gender_classifier.predict(rgb_face)
 						gender_label_arg = np.argmax(gender_prediction)
 						gender_text.append(gender_labels[gender_label_arg])
-
-						# eyeglasses
-						# TODO: FIX THIS
-						# rect = dlib.rectangle(face_x, face_y, face_x+face_w, face_y+face_h)
-						# landmarks = predictor(gray_img, rect)
-						# landmarks = landmarks_to_np(landmarks)
-						# LEFT_EYE_CENTER, RIGHT_EYE_CENTER = get_centers(flipped, landmarks)
-						# aligned_face = get_aligned_face(gray_img, LEFT_EYE_CENTER, RIGHT_EYE_CENTER)
-						# # print(judge_eyeglass(aligned_face))
-						# wearing_glasses.append(judge_eyeglass(aligned_face))
 
 						avg_counter += 1
 
@@ -339,7 +320,7 @@ while(ret):
 							msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
 							msg.add_arg(0)
 							msg = msg.build()
-							client.send(msg)
+							osc_client.send(msg)
 							# get timestamp
 							ts = time.gmtime()
 							timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
@@ -435,8 +416,7 @@ while(ret):
 									second_caption_counter = 0
 							else:
 								second_caption_counter += 1
-							# if max(set(wearing_glasses), key=wearing_glasses.count):
-							# 	second_caption += " and low vision"
+
 							pil_img = cv2.cvtColor(final_final_img,cv2.COLOR_BGR2RGB)
 							pilimg = Image.fromarray(pil_img)
 							draw = ImageDraw.Draw(pilimg)
@@ -449,27 +429,21 @@ while(ret):
 							cv2.imwrite(fileName, cv2img)
 							
 							# post to instagram
+							text = '"' + emotion_caption + '", 2019 |\r\n' + 'Collector Series |\r\n' + second_caption + '|\r\n\r\n#artcollector #thecollectors #thecollectorsgallery #portrait #art #workofart #artist #artsy #collector #privatecollection #lookinggood #artdealer #emergingartst #aicurator #humanmachine'
 							try:
-								subprocess.call([r'C:/Users/gabeb/take-my-pic/insta.bat', fileName, emotion_caption])
-							except subprocess.CalledProcessError as e:
-								print(e.output)
-							
+								with client(username, password) as cli:
+									cli.upload(fileName, text)
+							except Exception as e:
+								print(e)
+
 							flash_done = False
 							gabe_flash_counter = 12
 							flash_pause = True
 							tracking_faces = False
-		
-							# test_pass = False
-							# num_of_pics += 1
-							# if num_of_pics >= 1:
-							# 	looking_for_count += 1
-							# 	if looking_for_count  >= len(looking_for):
-							# 		looking_for_count = 0
-							# 	num_of_pics = 0
+
 							# Reset everything
 							avg_counter = 0
 							emotion_text.clear()
-							# wearing_glasses.clear()
 							shirt_color.clear()
 							gender_text.clear()
 							found_face = False
