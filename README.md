@@ -11,6 +11,12 @@ For best practice, all python libraries should be installed in a virtual environ
 
 pip install -r requirements.txt 
 
+Unistall instapy-cli and in git bash
+
+(in git bash)
+
+``pip install -e git+git@github.com:katsully/instapy-cli.git@master#egg=instapy-cli
+
 Make a faces directory in take-my-pic, and there must be a minimum of 4 images prepopulated in folder
 
 Must run script from the src directory
