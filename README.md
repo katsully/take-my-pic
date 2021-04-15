@@ -15,7 +15,7 @@ Unistall instapy-cli and in git bash
 
 (in git bash)
 
-``pip install -e git+git@github.com:katsully/instapy-cli.git@master#egg=instapy-cli
+``pip install -e git+git@github.com:katsully/instapy-cli.git@master#egg=instapy-cli``
 
 Make a faces directory in take-my-pic, and there must be a minimum of 4 images prepopulated in folder
 
