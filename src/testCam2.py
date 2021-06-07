@@ -17,31 +17,25 @@ from utils.kats_helper import landmarks_to_np
 from utils.kats_helper import rgb_to_hsv
 from utils.kats_helper import hsv_to_rgb
 from utils.kats_helper import ColorNames
-from InstaScreen import gabe_flash
 
 from PIL import Image
 from PIL import ImageDraw
-from PIL import ImageFont
-
-def moments_enabled(send_zero):
-	msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
-	msg.add_arg(send_zero)
-	msg = msg.build()
-	osc_client.send(msg)
 
 cam = cv2.VideoCapture(0)
+# cv2.namedWindow("insta", flags=cv2.WND_PROP_FULLSCREEN)
+# cv2.moveWindow("insta", 2160, 0)
+# cv2.setWindowProperty("insta", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
 
 cam.set(3,1920)	# width
 cam.set(4,1080)  # height
+
 
 face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
 emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
 emotion_labels = get_labels('fer2013')
 gender_model_path = '../trained_models/gender_models/simple_CNN.81-0.96.hdf5'
 gender_labels = get_labels('imdb')
-
-# build udp_client for osc protocol
-osc_client = udp_client.UDPClient("127.0.0.1", 8001)
 
 # counter for collecting the avg info about a person
 avg_counter = 0
@@ -55,6 +49,7 @@ face_y = 0
 face_w = 0
 face_h = 0
 face_analyze = False
+gender_text = []
 shirt_brightness = ""
 
 cropped_img = None
@@ -72,58 +67,10 @@ gender_classifier = load_model(gender_model_path, compile=False)
 emotion_target_size = emotion_classifier.input_shape[1:3]
 gender_target_size = gender_classifier.input_shape[1:3]
 
-# font
-ft_bold = ImageFont.truetype(font="fonts/NewsGothicStd-BoldOblique.otf",size=40)
-ft_color = ImageFont.truetype(font="fonts/News Gothic Regular.otf",size=32)
-ft_collection = ImageFont.truetype(font="fonts/News Gothic Regular.otf",size=18)
-
-# captions
-text_file = open("emotions1.txt", "r")
-emotion_list = [line.rstrip() for line in text_file.readlines()]
-emotion_list_counter = 0
-angry_file = open("anger.txt", "r")
-sad_file = open("sadness.txt", "r")
-disgust_file = open("disgust.txt", "r")
-happy_file = open("happiness.txt", "r")
-surprise_file = open("surprise.txt", "r")
-neutral_file = open("neutral.txt", "r")
-fear_file = open("fear.txt", "r")
-angry_list = [line.rstrip() for line in angry_file.readlines()]
-angry_file.close()
-sad_list = [line.rstrip() for line in sad_file.readlines()]
-sad_file.close()
-disgust_list = [line.rstrip() for line in disgust_file.readlines()]
-disgust_file.close()
-happy_list = [line.rstrip() for line in happy_file.readlines()]
-happy_file.close()
-surprise_list = [line.rstrip() for line in surprise_file.readlines()]
-surprise_file.close()
-neutral_list = [line.rstrip() for line in neutral_file.readlines()]
-neutral_file.close()
-fear_list = [line.rstrip() for line in fear_file.readlines()]
-fear_file.close()
-angry_counter = 0
-sad_counter = 0
-disgust_counter = 0
-happy_counter = 0
-surprise_counter = 0
-neutral_counter = 0
-fear_counter = 0
-new_emotion=""
-
 tracking_faces = True
-gabe_flash_counter = 0
-flash_done = False
-
 
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
-
-
-flash_pause_timer = 11
-
-second_caption_titles = ["Subject in ", "Figure in ", "A Study in ", "Portrait in ", "A Variation in "]
-second_caption_counter = 0 
 
 if cam.isOpened(): # try to get the first frame
 	ret, img = cam.read()	
@@ -132,31 +79,8 @@ else:
 
 while(ret):
 	ret, img = cam.read()
-	if tracking_faces == False:
-		if flash_done == True:
-			rand_num = random.randint(80-flash_pause_timer,100-flash_pause_timer)
-			t_end = time.time() + rand_num
-			tell_matt = time.time() + (rand_num * .7)
-			while time.time() < t_end:
-				arg = 1
-				if time.time() > tell_matt:
-					arg = 0
-				moments_enabled(arg)
-			tracking_faces = True	
-		else:
-			t_update_insta = time.time() + flash_pause_timer
-			if flash_pause:
-				while time.time() < t_update_insta:
-					moments_enabled(1)
-			flash_pause = False
-			gabe_flash_counter -= 1
-			if gabe_flash_counter == 0:
-				flash_done = True
+	
 	if tracking_faces:
-		# moments to Matt
-		moments_enabled(0)
-		# for flip and rotate, the camera must be turned as well! do not use when testing with 
-		# 'normal' camera
 		# flip camera 90 degrees
 		# rotate = imutils.rotate_bound(img, 90)
 		# flipped = cv2.flip(rotate, 1)
@@ -189,13 +113,16 @@ while(ret):
 		# camera found one or more faces
 		else:
 			# focusing on a single face
+			# print("found_face is " + str(found_face))
 			if found_face:
+				print("found a face")
 				x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), crop_offsets)
 				# crop image so we only focus on this face
 				cropped_img = gray_img[y1:y2, x1:x2]
 				faces = face_detector.detectMultiScale(cropped_img, scaleFactor=1.3, minNeighbors=6)
 				# is the face gone?
-				if len(faces) == 0:
+				if isinstance(faces, tuple):
+					print("face gone")
 					found_face = False
 					face_counter = 0
 					face_analyze = False
@@ -212,7 +139,7 @@ while(ret):
 							face_analyze = True
 					# we're ready to analyze this face!
 					if face_analyze:
-						cv2.rectangle(img,(x,y),(x+w,y+h),(200,200,0),2)
+						print("analyzing face")
 						x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
 						gray_face_og = gray_img[y1:y2, x1:x2]
 						x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), gender_offsets)
@@ -303,10 +230,10 @@ while(ret):
 							# 	if color_hex_num < 0x708090:
 							# 		test_pass = True
 							# if test_pass:
-							msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
-							msg.add_arg(0)
-							msg = msg.build()
-							osc_client.send(msg)
+							# msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
+							# msg.add_arg(0)
+							# msg = msg.build()
+							# osc_client.send(msg)
 							# get timestamp
 							ts = time.gmtime()
 							timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
@@ -350,76 +277,76 @@ while(ret):
 								shirt_list = avg_shirt_color
 							shirt_list = ''.join([i for i in shirt_list if not i.isdigit()])
 							# sad, surprise, happy, angry, neutral, disgust, and fear
-							emotion_caption = max(set(emotion_text), key=emotion_text.count)
-							if emotion_caption == "sad":
-								new_emotion = sad_list[sad_counter]
-								if sad_counter == len(sad_list)-1:
-									sad_counter = 0
-								else:
-									sad_counter+=1
-							elif emotion_caption == "happy":
-								new_emotion = happy_list[happy_counter]
-								if happy_counter == len(happy_list)-1:
-									happy_counter = 0
-								else:
-									happy_counter+=1
-							elif emotion_caption == "neutral":
-								new_emotion = neutral_list[neutral_counter]
-								if neutral_counter == len(neutral_list)-1:
-									neutral_counter = 0
-								else:
-									neutral_counter+=1
-							elif emotion_caption == "angry":
-								new_emotion = angry_list[angry_counter]
-								if angry_counter == len(angry_list)-1:
-									angry_counter = 0
-								else:
-									angry_counter+=1
-							elif emotion_caption == "fear":
-								new_emotion = fear_list[fear_counter]
-								if fear_counter == len(fear_list)-1:
-									fear_counter = 0
-								else:
-									fear_counter+=1
-							elif emotion_caption == "disgust":
-								new_emotion = disgust_list[disgust_counter]
-								if disgust_counter == len(disgust_list)-1:
-									disgust_counter = 0
-								else:
-									disgust_counter+=1
-							else:
-								new_emotion = surprise_list[surprise_counter]
-								if surprise_counter == len(surprise_list)-1:
-									surprise_counter = 0
-								else:
-									surprise_counter+=1
-							emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
-							if emotion_list_counter == len(emotion_list)-1:
-									emotion_list_counter = 0
-							else:
-								emotion_list_counter += 1
-							second_caption = second_caption_titles[second_caption_counter] + shirt_list.capitalize() 
-							if second_caption_counter == len(second_caption_titles)-1:
-									second_caption_counter = 0
-							else:
-								second_caption_counter += 1
+							# emotion_caption = max(set(emotion_text), key=emotion_text.count)
+							# if emotion_caption == "sad":
+							# 	new_emotion = sad_list[sad_counter]
+							# 	if sad_counter == len(sad_list)-1:
+							# 		sad_counter = 0
+							# 	else:
+							# 		sad_counter+=1
+							# elif emotion_caption == "happy":
+							# 	new_emotion = happy_list[happy_counter]
+							# 	if happy_counter == len(happy_list)-1:
+							# 		happy_counter = 0
+							# 	else:
+							# 		happy_counter+=1
+							# elif emotion_caption == "neutral":
+							# 	new_emotion = neutral_list[neutral_counter]
+							# 	if neutral_counter == len(neutral_list)-1:
+							# 		neutral_counter = 0
+							# 	else:
+							# 		neutral_counter+=1
+							# elif emotion_caption == "angry":
+							# 	new_emotion = angry_list[angry_counter]
+							# 	if angry_counter == len(angry_list)-1:
+							# 		angry_counter = 0
+							# 	else:
+							# 		angry_counter+=1
+							# elif emotion_caption == "fear":
+							# 	new_emotion = fear_list[fear_counter]
+							# 	if fear_counter == len(fear_list)-1:
+							# 		fear_counter = 0
+							# 	else:
+							# 		fear_counter+=1
+							# elif emotion_caption == "disgust":
+							# 	new_emotion = disgust_list[disgust_counter]
+							# 	if disgust_counter == len(disgust_list)-1:
+							# 		disgust_counter = 0
+							# 	else:
+							# 		disgust_counter+=1
+							# else:
+							# 	new_emotion = surprise_list[surprise_counter]
+							# 	if surprise_counter == len(surprise_list)-1:
+							# 		surprise_counter = 0
+							# 	else:
+							# 		surprise_counter+=1
+							# emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
+							# if emotion_list_counter == len(emotion_list)-1:
+							# 		emotion_list_counter = 0
+							# else:
+							# 	emotion_list_counter += 1
+							# second_caption = second_caption_titles[second_caption_counter] + shirt_list.capitalize() 
+							# if second_caption_counter == len(second_caption_titles)-1:
+							# 		second_caption_counter = 0
+							# else:
+							# 	second_caption_counter += 1
 
 							pil_img = cv2.cvtColor(final_final_img,cv2.COLOR_BGR2RGB)
 							pilimg = Image.fromarray(pil_img)
-							draw = ImageDraw.Draw(pilimg)
-							draw.text((new_width * .18, new_width + (new_width * .07)), emotion_caption, (0,0,0), font=ft_bold)
-							draw.text((new_width * .18, new_width + (new_width * .14)), second_caption, (0,0,0), font=ft_color)
-							draw.text((new_width * .18, new_width + (new_width * .21)), "2019", (0,0,0), font=ft_color)
-							draw.text((new_width * .18, new_width + (new_width * .28)), "Collection of the artist", (0,0,0), font=ft_collection)
+							# draw = ImageDraw.Draw(pilimg)
+							# draw.text((new_width * .18, new_width + (new_width * .07)), emotion_caption, (0,0,0), font=ft_bold)
+							# draw.text((new_width * .18, new_width + (new_width * .14)), second_caption, (0,0,0), font=ft_color)
+							# draw.text((new_width * .18, new_width + (new_width * .21)), "2019", (0,0,0), font=ft_color)
+							# draw.text((new_width * .18, new_width + (new_width * .28)), "Collection of the artist", (0,0,0), font=ft_collection)
 							cv2img = cv2.cvtColor(np.array(pilimg),cv2.COLOR_RGB2BGR)
-							# save file to faces database
+							# # save file to faces database
 							cv2.imwrite(fileName, cv2img)
 							
 
-							flash_done = False
-							gabe_flash_counter = 12
-							flash_pause = True
-							tracking_faces = False
+							# flash_done = False
+							# gabe_flash_counter = 12
+							# flash_pause = True
+							# tracking_faces = False
 
 							# Reset everything
 							avg_counter = 0
@@ -436,12 +363,15 @@ while(ret):
 				np.random.shuffle(faces)
 				for (x,y,w,h) in faces: 
 					found_face = True;
+					cv2.rectangle(img,(x,y),(x+w,y+h),(200,200,0),2)
 					print("found face is true")
 					face_x, face_y, face_w, face_h = x,y,w,h
 					break
 
-	# rotate = imutils.rotate_bound(img, 90)
-	cv2.imshow("test window", rotate)
+	# flip insta grid 90 degrees
+	# rotate_insta = imutils.rotate_bound(insta_grid,90)
+	cv2.imshow("test window", img)
+	# cv2.imshow("insta", rotate_insta)
 	k = cv2.waitKey(30 & 0xff)
 	if k == 27: 	# press ESC to quit
 		break
