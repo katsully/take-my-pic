@@ -16,13 +16,11 @@ from utils.preprocessor import preprocess_input
 from utils.kats_helper import landmarks_to_np
 from utils.kats_helper import rgb_to_hsv
 from utils.kats_helper import hsv_to_rgb
-from utils.kats_helper import ColorNames
 
 from PIL import Image
 from PIL import ImageDraw
 
 cam = cv2.VideoCapture(0)
-
 
 cam.set(3,1920)	# width
 cam.set(4,1080)  # height
@@ -31,6 +29,9 @@ cam.set(4,1080)  # height
 face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
 emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
 emotion_labels = get_labels('fer2013')
+
+# build udp_client for osc protocol
+osc_client = udp_client.UDPClient("127.0.0.1", 8001)
 
 # counter for collecting the avg info about a person
 avg_counter = 0
@@ -55,6 +56,41 @@ emotion_classifier = load_model(emotion_model_path, compile=False)
 # getting input model shapes for inference
 emotion_target_size = emotion_classifier.input_shape[1:3]
 
+# captions
+text_file = open("emotions1.txt", "r")
+emotion_list = [line.rstrip() for line in text_file.readlines()]
+emotion_list_counter = 0
+angry_file = open("anger.txt", "r")
+sad_file = open("sadness.txt", "r")
+disgust_file = open("disgust.txt", "r")
+happy_file = open("happiness.txt", "r")
+surprise_file = open("surprise.txt", "r")
+neutral_file = open("neutral.txt", "r")
+fear_file = open("fear.txt", "r")
+angry_list = [line.rstrip() for line in angry_file.readlines()]
+angry_file.close()
+sad_list = [line.rstrip() for line in sad_file.readlines()]
+sad_file.close()
+disgust_list = [line.rstrip() for line in disgust_file.readlines()]
+disgust_file.close()
+happy_list = [line.rstrip() for line in happy_file.readlines()]
+happy_file.close()
+surprise_list = [line.rstrip() for line in surprise_file.readlines()]
+surprise_file.close()
+neutral_list = [line.rstrip() for line in neutral_file.readlines()]
+neutral_file.close()
+fear_list = [line.rstrip() for line in fear_file.readlines()]
+fear_file.close()
+angry_counter = 0
+sad_counter = 0
+disgust_counter = 0
+happy_counter = 0
+surprise_counter = 0
+neutral_counter = 0
+fear_counter = 0
+new_emotion=""
+
+
 tracking_faces = True
 
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
@@ -70,12 +106,12 @@ while(ret):
 	
 	if tracking_faces:
 		# flip camera 90 degrees
-		# rotate = imutils.rotate_bound(img, 90)
-		# flipped = cv2.flip(rotate, 1)
+		rotate = imutils.rotate_bound(img, 90)
+		flipped = cv2.flip(rotate, 1)
 		# convert image to grayscale
-		gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+		gray_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
 		# convert from bgr to rgb
-		rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+		rgb_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2RGB)
 
 		# gray_img is the input grayscale image
 		# scaleFactor (optional) is specifying how much the image size is reduced at each image scale. It is used to create the scale pyramid
@@ -88,15 +124,11 @@ while(ret):
 		# if isinstance(faces, tuple):
 		if len(faces) == 0:
 			# reset 
-			print("no faces found")
 			found_face = False
 			face_analyze = False
 			face_counter = 0
 			avg_counter = 0
 			emotion_text.clear()
-			gender_text.clear()
-			# wearing_glasses.clear()
-			shirt_color.clear()
 
 		# camera found one or more faces
 		else:
@@ -115,8 +147,6 @@ while(ret):
 					face_counter = 0
 					face_analyze = False
 					emotion_text.clear()
-					shirt_color.clear()
-					gender_text.clear()
 				# face is still there
 				else:
 					# if we're still determining this face isn't someone quickly entering and exiting
@@ -130,11 +160,8 @@ while(ret):
 						print("analyzing face")
 						x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
 						gray_face_og = gray_img[y1:y2, x1:x2]
-						x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), gender_offsets)
-						rgb_face_og = rgb_img[y1:y2, x1:x2]
 						try:
 							gray_face = cv2.resize(gray_face_og, (emotion_target_size))
-							rgb_face = cv2.resize(rgb_face_og, (gender_target_size))
 						except:
 							continue
 						# get emotion
@@ -154,14 +181,14 @@ while(ret):
 							# get timestamp
 							ts = time.gmtime()
 							timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", ts)
-							fileName = "../faces/face" + timestamp + ".png"
+							fileName = "../faces/photo.png"
 							print(fileName)
 							# convert image to 1:1 aspect ratio						
 							x1 -= (x2-x1) * .25
 							x2 += (x2-x1) * .25
 							y1 -= (y2-y1) * .1
 							y2 += (y2-y1) * .45
-							flipped_h, flipped_w = img.shape[:2]
+							flipped_h, flipped_w = flipped.shape[:2]
 							if x1 < 0:
 								x1 = 0
 							if x2 >= flipped_w:
@@ -170,7 +197,7 @@ while(ret):
 								y1 = 0
 							if y2 >= flipped_h:
 								y2 = flipped_h -1
-							portrait_img = img[int(y1):int(y2), int(x1):int(x2)]
+							portrait_img = flipped[int(y1):int(y2), int(x1):int(x2)]
 							scale_percent = 225 # percent of original size
 							bigger_width = int(portrait_img.shape[1] * scale_percent / 100)
 							bigger_height = int(portrait_img.shape[0] * scale_percent / 100)
@@ -261,8 +288,6 @@ while(ret):
 							# Reset everything
 							avg_counter = 0
 							emotion_text.clear()
-							shirt_color.clear()
-							gender_text.clear()
 							found_face = False
 							face_analyze = False
 							face_counter = 0
@@ -280,7 +305,7 @@ while(ret):
 
 	# flip insta grid 90 degrees
 	# rotate_insta = imutils.rotate_bound(insta_grid,90)
-	cv2.imshow("test window", img)
+	cv2.imshow("test window", flipped)
 	# cv2.imshow("insta", rotate_insta)
 	k = cv2.waitKey(30 & 0xff)
 	if k == 27: 	# press ESC to quit
