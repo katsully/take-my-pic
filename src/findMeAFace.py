@@ -187,7 +187,7 @@ while(ret):
 		# scaleFactor (optional) is specifying how much the image size is reduced at each image scale. It is used to create the scale pyramid
 		# minNeighbors (optional) is specifying how many neighbors each candidate rectangle show have, to retain it. A higher number gives lower false positives
 		# minSize (optional) is the minimum rectangle size to be considered a face
-		faces = face_detector.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=6)
+		faces = face_detector.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=5)
 		# if no faces are detected
 		# when faces are detected, the faces variable is an array of tuple, when no faces are detected the faces variable is an empty tuple
 		if isinstance(faces, tuple):
@@ -208,7 +208,7 @@ while(ret):
 				x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), crop_offsets)
 				# crop image so we only focus on this face
 				cropped_img = gray_img[y1:y2, x1:x2]
-				faces = face_detector.detectMultiScale(cropped_img, scaleFactor=1.3, minNeighbors=6)
+				faces = face_detector.detectMultiScale(cropped_img, scaleFactor=1.3, minNeighbors=5)
 				# is the face gone?
 				if isinstance(faces, tuple):
 					found_face = False
