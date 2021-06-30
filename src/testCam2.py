@@ -6,7 +6,6 @@ from pythonosc import osc_message_builder
 from pythonosc import udp_client
 from pythonosc import dispatcher
 from pythonosc import osc_server
-import time
 from imutils import face_utils
 import imutils
 import random
@@ -15,10 +14,6 @@ import re
 from utils.datasets import get_labels
 from utils.inference import apply_offsets
 from utils.preprocessor import preprocess_input
-from utils.kats_helper import landmarks_to_np
-
-
-from PIL import Image
 
 cam = cv2.VideoCapture(0)
 
