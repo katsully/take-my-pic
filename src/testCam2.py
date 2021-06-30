@@ -4,8 +4,9 @@ import numpy as np
 import dlib
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
-from pythonosc import dispatcher
-from pythonosc import osc_server
+from pythonosc.osc_server import AsyncIOOSCUDPServer
+from pythonosc.dispatcher import Dispatcher
+import asyncio
 from imutils import rotate_bound
 from utils.datasets import get_labels
 from utils.inference import apply_offsets
@@ -60,6 +61,7 @@ for emotion in emotions:
     emotion_dict[emotion + "_counter"] = 0
     temp_file.close()
 new_emotion=""
+print(emotion_dict)
 
 
 # don't want to track faces during the photo taking animation
@@ -73,15 +75,11 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 def takePhoto():
     print("here")
     take_photo = True
-    
-if __name__ == "__main__":
-    dispatcher = dispatcher.Dispatcher()
-    dispatcher.map("/photoAnimation", takePhoto)
 
-    server = osc_server.ThreadingOSCUDPServer(
-        ("127.0.0.1", 8000), dispatcher)
-    print("Serving on {}".format(server.server_address))
+dispatcher = dispatcher.Dispatcher()
+dispatcher.map("/photoAnimation", takePhoto)
 
+async def loop():
     if cam.isOpened(): # try to get the first frame
         ret, img = cam.read()   
 
@@ -208,6 +206,8 @@ if __name__ == "__main__":
                                     new_emotion = emotion_dict[emotion_caption][emotion_dict[emotion_caption + "_counter"]]
                                     if emotion_dict[emotion_caption + "_counter"] == len(emotion_dict[emotion_caption])-1:
                                         emotion_dict[emotion_caption + "_counter"] = 0
+                                    else:
+                                        emotion_dict[emotion_caption + "_counter"] += 1
 
                                     emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
                                     if emotion_list_counter == len(emotion_list)-1:
@@ -217,7 +217,7 @@ if __name__ == "__main__":
 
                                     # send matt the title
                                     msg = osc_message_builder.OscMessageBuilder(address="/title")
-                                    msg.add_arg(emotion_text)
+                                    msg.add_arg(emotion_caption)
                                     msg = msg.build()
                                     osc_client.send(msg)
                                 
@@ -244,9 +244,20 @@ if __name__ == "__main__":
         k = cv2.waitKey(30 & 0xff)
         if k == 27:     # press ESC to quit
             break
+    
+async def init_main():
 
-    server.serve_forever()
+    server = osc_server.AsyncIOOSCUDPServer(
+        ("127.0.0.1", 8000), dispatcher, asyncio.get_event_loop())
+    transport, protocol = await server.create_serve_endpoint()  # Create datagram endpoint and start serving
 
+    await loop()    # entering main loop of program
+
+    transport.close()   # clean up serve endpoint
+
+asyncio.run(init_main())
+
+    
 # end of program
 cam.release()
 cv2.destroyAllWindows()
