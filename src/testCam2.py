@@ -6,11 +6,7 @@ from pythonosc import osc_message_builder
 from pythonosc import udp_client
 from pythonosc import dispatcher
 from pythonosc import osc_server
-from imutils import face_utils
-import imutils
-import random
-import re
-
+from imutils import rotate_bound
 from utils.datasets import get_labels
 from utils.inference import apply_offsets
 from utils.preprocessor import preprocess_input
@@ -31,7 +27,7 @@ osc_client = udp_client.UDPClient("127.0.0.1", 8001)
 avg_counter = 0
 face_counter = 0
 emotion_text = []
-found_face = False;
+found_face = False
 face_x = 0
 face_y = 0
 face_w = 0
@@ -152,7 +148,7 @@ if __name__ == "__main__":
         
         if tracking_faces:
             # flip camera 90 degrees
-            rotate = imutils.rotate_bound(img, 90)
+            rotate = rotate_bound(img, 90)
             flipped = cv2.flip(rotate, 1)
             # convert image to grayscale
             gray_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
