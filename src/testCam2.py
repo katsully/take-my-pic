@@ -50,34 +50,15 @@ emotion_target_size = emotion_classifier.input_shape[1:3]
 text_file = open("emotions1.txt", "r")
 emotion_list = [line.rstrip() for line in text_file.readlines()]
 emotion_list_counter = 0
-angry_file = open("anger.txt", "r")
-sad_file = open("sadness.txt", "r")
-disgust_file = open("disgust.txt", "r")
-happy_file = open("happiness.txt", "r")
-surprise_file = open("surprise.txt", "r")
-neutral_file = open("neutral.txt", "r")
-fear_file = open("fear.txt", "r")
-angry_list = [line.rstrip() for line in angry_file.readlines()]
-angry_file.close()
-sad_list = [line.rstrip() for line in sad_file.readlines()]
-sad_file.close()
-disgust_list = [line.rstrip() for line in disgust_file.readlines()]
-disgust_file.close()
-happy_list = [line.rstrip() for line in happy_file.readlines()]
-happy_file.close()
-surprise_list = [line.rstrip() for line in surprise_file.readlines()]
-surprise_file.close()
-neutral_list = [line.rstrip() for line in neutral_file.readlines()]
-neutral_file.close()
-fear_list = [line.rstrip() for line in fear_file.readlines()]
-fear_file.close()
-angry_counter = 0
-sad_counter = 0
-disgust_counter = 0
-happy_counter = 0
-surprise_counter = 0
-neutral_counter = 0
-fear_counter = 0
+emotions = ["anger", "sadness", "disgust", "happiness", "surprise", "neutral", "fear"]
+emotion_dict = dict()
+for emotion in emotions:
+    file_name = emotion + ".txt"
+    temp_file = open(file_name, "r")
+    temp_list = [line.rstrip() for line in temp_file.readlines()]
+    emotion_dict[emotion] = temp_list
+    emotion_dict[emotion + "_counter"] = 0
+    temp_file.close()
 new_emotion=""
 
 
@@ -222,48 +203,12 @@ if __name__ == "__main__":
                                     
                                     # sad, surprise, happy, angry, neutral, disgust, and fear
                                     emotion_caption = max(set(emotion_text), key=emotion_text.count)
-                                    if emotion_caption == "sad":
-                                        new_emotion = sad_list[sad_counter]
-                                        if sad_counter == len(sad_list)-1:
-                                            sad_counter = 0
-                                        else:
-                                            sad_counter+=1
-                                    elif emotion_caption == "happy":
-                                        new_emotion = happy_list[happy_counter]
-                                        if happy_counter == len(happy_list)-1:
-                                            happy_counter = 0
-                                        else:
-                                            happy_counter+=1
-                                    elif emotion_caption == "neutral":
-                                        new_emotion = neutral_list[neutral_counter]
-                                        if neutral_counter == len(neutral_list)-1:
-                                            neutral_counter = 0
-                                        else:
-                                            neutral_counter+=1
-                                    elif emotion_caption == "angry":
-                                        new_emotion = angry_list[angry_counter]
-                                        if angry_counter == len(angry_list)-1:
-                                            angry_counter = 0
-                                        else:
-                                            angry_counter+=1
-                                    elif emotion_caption == "fear":
-                                        new_emotion = fear_list[fear_counter]
-                                        if fear_counter == len(fear_list)-1:
-                                            fear_counter = 0
-                                        else:
-                                            fear_counter+=1
-                                    elif emotion_caption == "disgust":
-                                        new_emotion = disgust_list[disgust_counter]
-                                        if disgust_counter == len(disgust_list)-1:
-                                            disgust_counter = 0
-                                        else:
-                                            disgust_counter+=1
-                                    else:
-                                        new_emotion = surprise_list[surprise_counter]
-                                        if surprise_counter == len(surprise_list)-1:
-                                            surprise_counter = 0
-                                        else:
-                                            surprise_counter+=1
+
+                                    # get emotion word from correct list
+                                    new_emotion = emotion_dict[emotion_caption][emotion_dict[emotion_caption + "_counter"]]
+                                    if emotion_dict[emotion_caption + "_counter"] == len(emotion_dict[emotion_caption])-1:
+                                        emotion_dict[emotion_caption + "_counter"] = 0
+
                                     emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
                                     if emotion_list_counter == len(emotion_list)-1:
                                             emotion_list_counter = 0
