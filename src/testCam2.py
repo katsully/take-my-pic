@@ -274,12 +274,10 @@ while(ret):
 									
 			# still looking for a face to focus on
 			else:	
-				# print("in else statement")
 				np.random.shuffle(faces)
 				for (x,y,w,h) in faces: 
 					found_face = True;
 					cv2.rectangle(img,(x,y),(x+w,y+h),(200,200,0),2)
-					# print("found face is true")
 					face_x, face_y, face_w, face_h = x,y,w,h
 					break
 
