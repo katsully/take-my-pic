@@ -19,7 +19,6 @@ from utils.kats_helper import landmarks_to_np
 
 
 from PIL import Image
-from PIL import ImageDraw
 
 cam = cv2.VideoCapture(0)
 
