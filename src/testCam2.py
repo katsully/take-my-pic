@@ -20,21 +20,23 @@ cam.set(4,1080)  # height
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 
-take_photo = False
+tracking_faces = True
 
 x1=0
 x2=0
 y1=0
 y2=0
 
+flipped = {}
+
 def takePhoto(address, *args):
     print("here")
-    global take_photo   # need to modify global copy of take_photo
     global x1
     global x2
     global y1
     global y2
-    take_photo = True
+    global flipped
+    global tracking_faces
 
     fileName = "../faces/photo.png"
     print(fileName)
@@ -63,11 +65,9 @@ def takePhoto(address, *args):
     # crop image to be square
     new_height = aspect_ratio_w 
     final_img = resized[0:int(new_height), 0:aspect_ratio_w]
-    uniform_size = cv2.resize(final_img, (600,600))
     # save file to faces database
     cv2.imwrite(fileName, final_img)
     tracking_faces = True
-    take_photo = False
 
 dispatcher = Dispatcher()
 dispatcher.map("/photoAnimation", takePhoto)
@@ -80,6 +80,8 @@ async def faceFinding():
     global x2
     global y1
     global y2
+    global flipped
+    global tracking_faces
 
     face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
     emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
@@ -97,8 +99,6 @@ async def faceFinding():
     # getting input model shapes for inference
     emotion_target_size = emotion_classifier.input_shape[1:3]
 
-    # don't want to track faces during the photo taking animation
-    tracking_faces = True
     # keep track of capturing every third face
     capture_counter =  0
 
@@ -117,7 +117,7 @@ async def faceFinding():
     text_file = open("emotions1.txt", "r")
     emotion_list = [line.rstrip() for line in text_file.readlines()]
     emotion_list_counter = 0
-    emotions = ["angry", "sadness", "disgust", "happy", "surprise", "neutral", "fear"]
+    emotions = ["angry", "sad", "disgust", "happy", "surprise", "neutral", "fear"]
     emotion_dict = dict()
     for emotion in emotions:
         file_name = emotion + ".txt"
@@ -142,16 +142,12 @@ async def faceFinding():
 
         # release program control back to the event loop
         await asyncio.sleep(0)
-
-        # take the picture! 
-        # then go back to scanning for faces
-        # if take_photo:
             
-        
+        # flip camera 90 degrees
+        rotate = rotate_bound(img, 90)
+        flipped = cv2.flip(rotate, 1)
+
         if tracking_faces:
-            # flip camera 90 degrees
-            rotate = rotate_bound(img, 90)
-            flipped = cv2.flip(rotate, 1)
             # convert image to grayscale
             gray_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
             # convert from bgr to rgb
@@ -264,10 +260,10 @@ async def faceFinding():
                         face_x, face_y, face_w, face_h = x,y,w,h
                         break
 
-        # cv2.imshow("test window", flipped)
-        k = cv2.waitKey(30 & 0xff)
-        if k == 27:     # press ESC to quit
-            break
+            # cv2.imshow("test window", flipped)
+            # k = cv2.waitKey(30 & 0xff)
+            # if k == 27:     # press ESC to quit
+            #     break
     
 async def init_main():
     server = AsyncIOOSCUDPServer(
