@@ -162,8 +162,6 @@ if __name__ == "__main__":
             faces = face_detector.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=6)
             
             # if no faces are detected
-            # when faces are detected, the faces variable is an array of tuple, when no faces are detected the faces variable is an empty tuple
-            # if isinstance(faces, tuple):
             if len(faces) == 0:
                 # reset 
                 found_face = False
