@@ -76,7 +76,7 @@ def takePhoto():
     print("here")
     take_photo = True
 
-dispatcher = dispatcher.Dispatcher()
+dispatcher = Dispatcher()
 dispatcher.map("/photoAnimation", takePhoto)
 
 async def loop():
