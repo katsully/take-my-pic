@@ -17,69 +17,120 @@ cam = cv2.VideoCapture(0)
 cam.set(3,1920) # width
 cam.set(4,1080)  # height
 
-face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
-emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
-emotion_labels = get_labels('fer2013')
-
-# build udp_client for osc protocol
-osc_client = udp_client.UDPClient("127.0.0.1", 8001)
-
-# counter for collecting the avg info about a person
-avg_counter = 0
-face_counter = 0
-emotion_text = []
-found_face = False
-face_x = 0
-face_y = 0
-face_w = 0
-face_h = 0
-face_analyze = False
-
-cropped_img = None
-
-# hyper-parameters for bounding boxes shape
-crop_offsets = (50, 70)
-emotion_offsets = (20, 40)
-
-# loading models
-emotion_classifier = load_model(emotion_model_path, compile=False)
-
-# getting input model shapes for inference
-emotion_target_size = emotion_classifier.input_shape[1:3]
-
-# captions
-text_file = open("emotions1.txt", "r")
-emotion_list = [line.rstrip() for line in text_file.readlines()]
-emotion_list_counter = 0
-emotions = ["anger", "sadness", "disgust", "happiness", "surprise", "neutral", "fear"]
-emotion_dict = dict()
-for emotion in emotions:
-    file_name = emotion + ".txt"
-    temp_file = open(file_name, "r")
-    temp_list = [line.rstrip() for line in temp_file.readlines()]
-    emotion_dict[emotion] = temp_list
-    emotion_dict[emotion + "_counter"] = 0
-    temp_file.close()
-new_emotion=""
-print(emotion_dict)
-
-
-# don't want to track faces during the photo taking animation
-tracking_faces = True
-# keep track of capturing every third face
-capture_counter =  0
-
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 
-def takePhoto():
+take_photo = False
+
+x1=0
+x2=0
+y1=0
+y2=0
+
+def takePhoto(address, *args):
     print("here")
+    global take_photo   # need to modify global copy of take_photo
+    global x1
+    global x2
+    global y1
+    global y2
     take_photo = True
+
+    fileName = "../faces/photo.png"
+    print(fileName)
+    # convert image to 1:1 aspect ratio                     
+    x1 -= (x2-x1) * .25
+    x2 += (x2-x1) * .25
+    y1 -= (y2-y1) * .1
+    y2 += (y2-y1) * .4
+    flipped_h, flipped_w = flipped.shape[:2]
+    if x1 < 0:
+        x1 = 0
+    if x2 >= flipped_w:
+        x2 = flipped_w -1
+    if y1 < 0:
+        y1 = 0
+    if y2 >= flipped_h:
+        y2 = flipped_h -1
+    portrait_img = flipped[int(y1):int(y2), int(x1):int(x2)]
+    scale_percent = 225 # percent of original size
+    bigger_width = int(portrait_img.shape[1] * scale_percent / 100)
+    bigger_height = int(portrait_img.shape[0] * scale_percent / 100)
+    dim = (bigger_width, bigger_height)
+    # resize image
+    resized = cv2.resize(portrait_img, dim, interpolation = cv2.INTER_CUBIC)
+    aspect_ratio_h, aspect_ratio_w = resized.shape[:2]
+    # crop image to be square
+    new_height = aspect_ratio_w 
+    final_img = resized[0:int(new_height), 0:aspect_ratio_w]
+    uniform_size = cv2.resize(final_img, (600,600))
+    # save file to faces database
+    cv2.imwrite(fileName, final_img)
+    tracking_faces = True
+    take_photo = False
 
 dispatcher = Dispatcher()
 dispatcher.map("/photoAnimation", takePhoto)
 
 async def faceFinding():
+
+    global cam
+    global take_photo   # need to modify global copy of take_photo
+    global x1
+    global x2
+    global y1
+    global y2
+
+    face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
+    emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
+    emotion_labels = get_labels('fer2013')
+
+    cropped_img = None
+
+    # hyper-parameters for bounding boxes shape
+    crop_offsets = (50, 70)
+    emotion_offsets = (20, 40)
+
+    # loading models
+    emotion_classifier = load_model(emotion_model_path, compile=False)
+
+    # getting input model shapes for inference
+    emotion_target_size = emotion_classifier.input_shape[1:3]
+
+    # don't want to track faces during the photo taking animation
+    tracking_faces = True
+    # keep track of capturing every third face
+    capture_counter =  0
+
+    # counter for collecting the avg info about a person
+    avg_counter = 0
+    face_counter = 0
+    emotion_text = []
+    found_face = False
+    face_x = 0
+    face_y = 0
+    face_w = 0
+    face_h = 0
+    face_analyze = False
+
+    # captions
+    text_file = open("emotions1.txt", "r")
+    emotion_list = [line.rstrip() for line in text_file.readlines()]
+    emotion_list_counter = 0
+    emotions = ["angry", "sadness", "disgust", "happy", "surprise", "neutral", "fear"]
+    emotion_dict = dict()
+    for emotion in emotions:
+        file_name = emotion + ".txt"
+        temp_file = open(file_name, "r")
+        temp_list = [line.rstrip() for line in temp_file.readlines()]
+        emotion_dict[emotion] = temp_list
+        emotion_dict[emotion + "_counter"] = 0
+        temp_file.close()
+    new_emotion=""
+
+    # build udp_client for osc protocol
+    osc_client = udp_client.UDPClient("127.0.0.1", 8001)
+
     if cam.isOpened(): # try to get the first frame
         ret, img = cam.read()   
 
@@ -89,41 +140,13 @@ async def faceFinding():
     while(ret):
         ret, img = cam.read()
 
+        # release program control back to the event loop
+        await asyncio.sleep(0)
+
         # take the picture! 
         # then go back to scanning for faces
-        if take_photo:
-            fileName = "../faces/photo.png"
-            print(fileName)
-            # convert image to 1:1 aspect ratio                     
-            x1 -= (x2-x1) * .5
-            x2 += (x2-x1) * .5
-            y1 -= (y2-y1) * .25
-            y2 += (y2-y1) * .75
-            flipped_h, flipped_w = flipped.shape[:2]
-            if x1 < 0:
-                x1 = 0
-            if x2 >= flipped_w:
-                x2 = flipped_w -1
-            if y1 < 0:
-                y1 = 0
-            if y2 >= flipped_h:
-                y2 = flipped_h -1
-            portrait_img = flipped[int(y1):int(y2), int(x1):int(x2)]
-            scale_percent = 225 # percent of original size
-            bigger_width = int(portrait_img.shape[1] * scale_percent / 100)
-            bigger_height = int(portrait_img.shape[0] * scale_percent / 100)
-            dim = (bigger_width, bigger_height)
-            # resize image
-            resized = cv2.resize(portrait_img, dim, interpolation = cv2.INTER_CUBIC)
-            aspect_ratio_h, aspect_ratio_w = resized.shape[:2]
-            # crop image to be square
-            new_height = aspect_ratio_w 
-            final_img = resized[0:int(new_height), 0:aspect_ratio_w]
-            uniform_size = cv2.resize(final_img, (600,600))
-            # save file to faces database
-            cv2.imwrite(fileName, final_img)
-            tracking_faces = True
-            take_photo = False
+        # if take_photo:
+            
         
         if tracking_faces:
             # flip camera 90 degrees
@@ -191,6 +214,7 @@ async def faceFinding():
                             if avg_counter > 30:  
                                 if capture_counter % 3 == 0:  
                                     # tell matt to take a photo
+                                    print("sending to matt to take pic")
                                     msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
                                     msg.add_arg(0)
                                     msg = msg.build()
@@ -240,23 +264,22 @@ async def faceFinding():
                         face_x, face_y, face_w, face_h = x,y,w,h
                         break
 
-        cv2.imshow("test window", flipped)
+        # cv2.imshow("test window", flipped)
         k = cv2.waitKey(30 & 0xff)
         if k == 27:     # press ESC to quit
             break
     
 async def init_main():
-
-    server = osc_server.AsyncIOOSCUDPServer(
-        ("127.0.0.1", 8000), dispatcher, asyncio.get_event_loop())
+    server = AsyncIOOSCUDPServer(
+        ("127.0.0.1", 8002), dispatcher, asyncio.get_event_loop())
     transport, protocol = await server.create_serve_endpoint()  # Create datagram endpoint and start serving
 
-    await loop()    # entering main loop of program
+    await faceFinding()    # entering main loop of program
 
     transport.close()   # clean up serve endpoint
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete(faceFinding())
+loop.run_until_complete(init_main())
     
 # end of program
 cam.release()
