@@ -79,7 +79,7 @@ def takePhoto():
 dispatcher = Dispatcher()
 dispatcher.map("/photoAnimation", takePhoto)
 
-async def loop():
+async def faceFinding():
     if cam.isOpened(): # try to get the first frame
         ret, img = cam.read()   
 
@@ -255,8 +255,8 @@ async def init_main():
 
     transport.close()   # clean up serve endpoint
 
-asyncio.run(init_main())
-
+loop = asyncio.get_event_loop()
+loop.run_until_complete(faceFinding())
     
 # end of program
 cam.release()
