@@ -96,7 +96,6 @@ tracking_faces = True
 # keep track of capturing every third face
 capture_counter =  0
 
-
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 
@@ -127,10 +126,10 @@ if __name__ == "__main__":
             fileName = "../faces/photo.png"
             print(fileName)
             # convert image to 1:1 aspect ratio                     
-            x1 -= (x2-x1) * .25
-            x2 += (x2-x1) * .25
-            y1 -= (y2-y1) * .1
-            y2 += (y2-y1) * .45
+            x1 -= (x2-x1) * .5
+            x2 += (x2-x1) * .5
+            y1 -= (y2-y1) * .25
+            y2 += (y2-y1) * .75
             flipped_h, flipped_w = flipped.shape[:2]
             if x1 < 0:
                 x1 = 0
@@ -186,16 +185,13 @@ if __name__ == "__main__":
             # camera found one or more faces
             else:
                 # focusing on a single face
-                # print("found_face is " + str(found_face))
                 if found_face:
-                    print("found a face")
                     x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), crop_offsets)
                     # crop image so we only focus on this face
                     cropped_img = gray_img[y1:y2, x1:x2]
                     faces = face_detector.detectMultiScale(cropped_img, scaleFactor=1.3, minNeighbors=6)
                     # is the face gone?
                     if isinstance(faces, tuple):
-                        print("face gone")
                         found_face = False
                         face_counter = 0
                         face_analyze = False
@@ -210,7 +206,6 @@ if __name__ == "__main__":
                                 face_analyze = True
                         # we're ready to analyze this face!
                         if face_analyze:
-                            print("analyzing face")
                             x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
                             gray_face_og = gray_img[y1:y2, x1:x2]
                             try:
@@ -226,76 +221,75 @@ if __name__ == "__main__":
 
                             avg_counter += 1
 
-                            if avg_counter > 30:    
-                                # tell matt to take a photo
-                                msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
-                                msg.add_arg(0)
-                                msg = msg.build()
-                                osc_client.send(msg)
+                            if avg_counter > 30:  
+                                if capture_counter % 3 == 0:  
+                                    # tell matt to take a photo
+                                    msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
+                                    msg.add_arg(0)
+                                    msg = msg.build()
+                                    osc_client.send(msg)
 
-                                # stop searching for faces until matt takes photo
-                                tracking_faces = False
+                                    # stop searching for faces until matt takes photo
+                                    tracking_faces = False
+                                    
+                                    # sad, surprise, happy, angry, neutral, disgust, and fear
+                                    emotion_caption = max(set(emotion_text), key=emotion_text.count)
+                                    if emotion_caption == "sad":
+                                        new_emotion = sad_list[sad_counter]
+                                        if sad_counter == len(sad_list)-1:
+                                            sad_counter = 0
+                                        else:
+                                            sad_counter+=1
+                                    elif emotion_caption == "happy":
+                                        new_emotion = happy_list[happy_counter]
+                                        if happy_counter == len(happy_list)-1:
+                                            happy_counter = 0
+                                        else:
+                                            happy_counter+=1
+                                    elif emotion_caption == "neutral":
+                                        new_emotion = neutral_list[neutral_counter]
+                                        if neutral_counter == len(neutral_list)-1:
+                                            neutral_counter = 0
+                                        else:
+                                            neutral_counter+=1
+                                    elif emotion_caption == "angry":
+                                        new_emotion = angry_list[angry_counter]
+                                        if angry_counter == len(angry_list)-1:
+                                            angry_counter = 0
+                                        else:
+                                            angry_counter+=1
+                                    elif emotion_caption == "fear":
+                                        new_emotion = fear_list[fear_counter]
+                                        if fear_counter == len(fear_list)-1:
+                                            fear_counter = 0
+                                        else:
+                                            fear_counter+=1
+                                    elif emotion_caption == "disgust":
+                                        new_emotion = disgust_list[disgust_counter]
+                                        if disgust_counter == len(disgust_list)-1:
+                                            disgust_counter = 0
+                                        else:
+                                            disgust_counter+=1
+                                    else:
+                                        new_emotion = surprise_list[surprise_counter]
+                                        if surprise_counter == len(surprise_list)-1:
+                                            surprise_counter = 0
+                                        else:
+                                            surprise_counter+=1
+                                    emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
+                                    if emotion_list_counter == len(emotion_list)-1:
+                                            emotion_list_counter = 0
+                                    else:
+                                        emotion_list_counter += 1
+
+                                    # send matt the title
+                                    msg = osc_message_builder.OscMessageBuilder(address="/title")
+                                    msg.add_arg(emotion_text)
+                                    msg = msg.build()
+                                    osc_client.send(msg)
                                 
-                                # sad, surprise, happy, angry, neutral, disgust, and fear
-                                emotion_caption = max(set(emotion_text), key=emotion_text.count)
-                                if emotion_caption == "sad":
-                                    new_emotion = sad_list[sad_counter]
-                                    if sad_counter == len(sad_list)-1:
-                                        sad_counter = 0
-                                    else:
-                                        sad_counter+=1
-                                elif emotion_caption == "happy":
-                                    new_emotion = happy_list[happy_counter]
-                                    if happy_counter == len(happy_list)-1:
-                                        happy_counter = 0
-                                    else:
-                                        happy_counter+=1
-                                elif emotion_caption == "neutral":
-                                    new_emotion = neutral_list[neutral_counter]
-                                    if neutral_counter == len(neutral_list)-1:
-                                        neutral_counter = 0
-                                    else:
-                                        neutral_counter+=1
-                                elif emotion_caption == "angry":
-                                    new_emotion = angry_list[angry_counter]
-                                    if angry_counter == len(angry_list)-1:
-                                        angry_counter = 0
-                                    else:
-                                        angry_counter+=1
-                                elif emotion_caption == "fear":
-                                    new_emotion = fear_list[fear_counter]
-                                    if fear_counter == len(fear_list)-1:
-                                        fear_counter = 0
-                                    else:
-                                        fear_counter+=1
-                                elif emotion_caption == "disgust":
-                                    new_emotion = disgust_list[disgust_counter]
-                                    if disgust_counter == len(disgust_list)-1:
-                                        disgust_counter = 0
-                                    else:
-                                        disgust_counter+=1
-                                else:
-                                    new_emotion = surprise_list[surprise_counter]
-                                    if surprise_counter == len(surprise_list)-1:
-                                        surprise_counter = 0
-                                    else:
-                                        surprise_counter+=1
-                                emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
-                                if emotion_list_counter == len(emotion_list)-1:
-                                        emotion_list_counter = 0
-                                else:
-                                    emotion_list_counter += 1
 
-                                # send matt the title
-                                msg = osc_message_builder.OscMessageBuilder(address="/title")
-                                msg.add_arg(emotion_text)
-                                msg = msg.build()
-                                osc_client.send(msg)
-                                
-
-                                # flash_done = False
-                                # gabe_flash_counter = 12
-                                # flash_pause = True
+                                capture_counter += 1
 
                                 # Reset everything
                                 avg_counter = 0
@@ -306,19 +300,14 @@ if __name__ == "__main__":
                         
                 # still looking for a face to focus on
                 else:   
-                    print("in else statement")
                     np.random.shuffle(faces)
                     for (x,y,w,h) in faces: 
                         found_face = True;
                         cv2.rectangle(img,(x,y),(x+w,y+h),(200,200,0),2)
-                        print("found face is true")
                         face_x, face_y, face_w, face_h = x,y,w,h
                         break
 
-        # flip insta grid 90 degrees
-        # rotate_insta = imutils.rotate_bound(insta_grid,90)
         cv2.imshow("test window", flipped)
-        # cv2.imshow("insta", rotate_insta)
         k = cv2.waitKey(30 & 0xff)
         if k == 27:     # press ESC to quit
             break
