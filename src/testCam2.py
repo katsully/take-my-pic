@@ -11,96 +11,123 @@ from imutils import rotate_bound
 from utils.datasets import get_labels
 from utils.inference import apply_offsets
 from utils.preprocessor import preprocess_input
+from random import randint
+from time import time
+from PIL import Image
 
 cam = cv2.VideoCapture(0)
-
 cam.set(3,1920) # width
 cam.set(4,1080)  # height
-
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 
-tracking_faces = True
-
-x1=0
-x2=0
-y1=0
-y2=0
+x1 = x2 = y1 = y2 = 0
 
 flipped = {}
 
-def takePhoto(address, *args):
-    print("here")
+moment_time = False
+
+# build udp_client for osc protocol
+osc_client = udp_client.UDPClient("127.0.0.1", 8001)
+
+def take_photo(address, *args):
     global x1
     global x2
     global y1
     global y2
     global flipped
-    global tracking_faces
+    global moment_time
 
-    fileName = "../faces/photo.png"
-    print(fileName)
     # convert image to 1:1 aspect ratio                     
-    x1 -= (x2-x1) * .25
-    x2 += (x2-x1) * .25
-    y1 -= (y2-y1) * .1
-    y2 += (y2-y1) * .4
-    flipped_h, flipped_w = flipped.shape[:2]
-    if x1 < 0:
-        x1 = 0
-    if x2 >= flipped_w:
-        x2 = flipped_w -1
-    if y1 < 0:
-        y1 = 0
-    if y2 >= flipped_h:
-        y2 = flipped_h -1
-    portrait_img = flipped[int(y1):int(y2), int(x1):int(x2)]
-    scale_percent = 225 # percent of original size
-    bigger_width = int(portrait_img.shape[1] * scale_percent / 100)
-    bigger_height = int(portrait_img.shape[0] * scale_percent / 100)
-    dim = (bigger_width, bigger_height)
-    # resize image
-    resized = cv2.resize(portrait_img, dim, interpolation = cv2.INTER_CUBIC)
-    aspect_ratio_h, aspect_ratio_w = resized.shape[:2]
+    # x1 -= (x2-x1) * .25
+    # x2 += (x2-x1) * .25
+    # y1 -= (y2-y1) * .1
+    # y2 += (y2-y1) * .4
+    # flipped_h, flipped_w = flipped.shape[:2]
+    # if x1 < 0:
+    #     x1 = 0
+    # if x2 >= flipped_w:
+    #     x2 = flipped_w -1
+    # if y1 < 0:
+    #     y1 = 0
+    # if y2 >= flipped_h:
+    #     y2 = flipped_h -1
+    # portrait_img = flipped[int(y1):int(y2), int(x1):int(x2)]
+    # scale_percent = 225 # percent of original size
+    # bigger_width = int(portrait_img.shape[1] * scale_percent / 100)
+    # bigger_height = int(portrait_img.shape[0] * scale_percent / 100)
+    # dim = (bigger_width, bigger_height)
+    # # resize image
+    # resized = cv2.resize(portrait_img, dim, interpolation = cv2.INTER_CUBIC)
+    # aspect_ratio_h, aspect_ratio_w = resized.shape[:2]
     # crop image to be square
-    new_height = aspect_ratio_w 
-    final_img = resized[0:int(new_height), 0:aspect_ratio_w]
+    # new_height = aspect_ratio_w 
+    # final_img = resized[0:int(new_height), 0:aspect_ratio_w]
     # save file to faces database
-    cv2.imwrite(fileName, final_img)
-    tracking_faces = True
+    # cv2.imwrite(file_name, final_img)
+
+    img_h, img_w = flipped.shape[:2]
+    remaining_y_space = img_w - (y2 - y1)
+    if y1 - (remaining_y_space/2) < 0:
+        remaining_y_space -= y1
+        y1 = 0
+        y2 += remaining_y_space
+    elif y + (remaining_y_space/2) > img_h:
+        remaining_y_space -= img_h - y2
+        y2 - img_h
+        y1 -= remaining_y_space
+    else:
+        y2 += remaining_y_space / 2
+        y1 -= remaining_y_space / 2
+    crop_img = flipped[y1:y2, 0:img_w]
+
+    pil_img = cv2.cvtColor(crop_img,cv2.COLOR_BGR2RGB)
+    pilimg = Image.fromarray(pil_img)
+
+    overlay = Image.open('CarliSelfie.png')
+
+    pilimg.paste(overlay, (0,0), mask = overlay)
+
+    cv2img = cv2.cvtColor(np.array(pilimg),cv2.COLOR_RGB2BGR)
+
+    cv2.imwrite("../faces/photo.png", cv2img)
+    print("saved photo")
+    moment_time = True
 
 dispatcher = Dispatcher()
-dispatcher.map("/photoAnimation", takePhoto)
+dispatcher.map("/photoAnimation", take_photo)
 
-async def faceFinding():
+def moments_enabled(arg):
+    msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
+    msg.add_arg(arg)
+    msg = msg.build()
+    osc_client.send(msg)
+
+
+async def face_finding():
 
     global cam
-    global take_photo   # need to modify global copy of take_photo
     global x1
     global x2
     global y1
     global y2
     global flipped
-    global tracking_faces
+    global moment_time
 
     face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
     emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
     emotion_labels = get_labels('fer2013')
 
-    cropped_img = None
-
     # hyper-parameters for bounding boxes shape
     crop_offsets = (50, 70)
     emotion_offsets = (20, 40)
 
-    # loading models
-    emotion_classifier = load_model(emotion_model_path, compile=False)
+    emotion_classifier = load_model(emotion_model_path, compile=False)      # loading models
+    emotion_target_size = emotion_classifier.input_shape[1:3]       # getting input model shapes for inference
 
-    # getting input model shapes for inference
-    emotion_target_size = emotion_classifier.input_shape[1:3]
-
-    # keep track of capturing every third face
-    capture_counter =  0
+   
+    capture_counter = 0     # keep track of capturing every third face
+    tracking_faces = True   # whether we are tracking faces or letting the avatars do an animation (ie a 'moment')
 
     # counter for collecting the avg info about a person
     avg_counter = 0
@@ -114,22 +141,13 @@ async def faceFinding():
     face_analyze = False
 
     # captions
-    text_file = open("emotions1.txt", "r")
-    emotion_list = [line.rstrip() for line in text_file.readlines()]
-    emotion_list_counter = 0
-    emotions = ["angry", "sad", "disgust", "happy", "surprise", "neutral", "fear"]
+    emotions = ["angry_disgust", "fear_sad", "happy_neutral", "surprise"]
     emotion_dict = dict()
     for emotion in emotions:
-        file_name = emotion + ".txt"
-        temp_file = open(file_name, "r")
-        temp_list = [line.rstrip() for line in temp_file.readlines()]
-        emotion_dict[emotion] = temp_list
-        emotion_dict[emotion + "_counter"] = 0
+        temp_file = open(emotion + ".txt", "r")
+        emotion_dict[emotion] = [line.rstrip() for line in temp_file.readlines()]
+        emotion_dict[emotion + "_prev"] = ""
         temp_file.close()
-    new_emotion=""
-
-    # build udp_client for osc protocol
-    osc_client = udp_client.UDPClient("127.0.0.1", 8001)
 
     if cam.isOpened(): # try to get the first frame
         ret, img = cam.read()   
@@ -148,6 +166,9 @@ async def faceFinding():
         flipped = cv2.flip(rotate, 1)
 
         if tracking_faces:
+            # tell Matt not to start animation
+            moments_enabled(0)
+
             # convert image to grayscale
             gray_img = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
             # convert from bgr to rgb
@@ -222,25 +243,26 @@ async def faceFinding():
                                     # sad, surprise, happy, angry, neutral, disgust, and fear
                                     emotion_caption = max(set(emotion_text), key=emotion_text.count)
 
-                                    # get emotion word from correct list
-                                    new_emotion = emotion_dict[emotion_caption][emotion_dict[emotion_caption + "_counter"]]
-                                    if emotion_dict[emotion_caption + "_counter"] == len(emotion_dict[emotion_caption])-1:
-                                        emotion_dict[emotion_caption + "_counter"] = 0
-                                    else:
-                                        emotion_dict[emotion_caption + "_counter"] += 1
+                                    if emotion_caption == "sad" or emotion_caption == "fear":
+                                        emotion_caption = "fear_sad"
+                                    elif emotion_caption == "angry" or emotion_caption == "disgust":
+                                        emotion_caption = "angry_disgust"
+                                    elif emotion_caption == "happy" or emotion_caption == "neutral":
+                                        emotion_caption = "happy_neutral"
 
-                                    emotion_caption = emotion_list[emotion_list_counter].replace("(Emotion)", new_emotion)
-                                    if emotion_list_counter == len(emotion_list)-1:
-                                            emotion_list_counter = 0
-                                    else:
-                                        emotion_list_counter += 1
+                                    rand_index = randint(0,len(emotion_dict[emotion_caption])-1)
+                                    emotion_title = emotion_dict[emotion_caption][rand_index]
+                                    while emotion_title == emotion_dict[emotion_caption + "_prev"]:
+                                        rand_index = randint(0,len(emotion_dict[emotion_caption])-1)
+                                        emotion_title = emotion_dict[emotion_caption][rand_index]
+                                    emotion_dict[emotion_caption + "_prev"] = emotion_title
 
                                     # send matt the title
                                     msg = osc_message_builder.OscMessageBuilder(address="/title")
-                                    msg.add_arg(emotion_caption)
+                                    msg.add_arg(emotion_title)
+                                    print(emotion_title)
                                     msg = msg.build()
-                                    osc_client.send(msg)
-                                
+                                    osc_client.send(msg)    
 
                                 capture_counter += 1
 
@@ -256,21 +278,29 @@ async def faceFinding():
                     np.random.shuffle(faces)
                     for (x,y,w,h) in faces: 
                         found_face = True;
-                        cv2.rectangle(img,(x,y),(x+w,y+h),(200,200,0),2)
                         face_x, face_y, face_w, face_h = x,y,w,h
                         break
+            cv2.imshow("test window", flipped)
+            k = cv2.waitKey(30 & 0xff)
+            if k == 27:
+                break
+        # time right after photo is taken, where the avatar will do an animation/moment
+        elif moment_time:
+            rand_num = randint(60,90)
+            t_end = time() + rand_num
+            while time() < t_end:
+                moments_enabled(1)
+            moments_enabled(0)
+            tracking_faces = True
+            moment_time = False
 
-            # cv2.imshow("test window", flipped)
-            # k = cv2.waitKey(30 & 0xff)
-            # if k == 27:     # press ESC to quit
-            #     break
     
 async def init_main():
     server = AsyncIOOSCUDPServer(
         ("127.0.0.1", 8002), dispatcher, asyncio.get_event_loop())
     transport, protocol = await server.create_serve_endpoint()  # Create datagram endpoint and start serving
 
-    await faceFinding()    # entering main loop of program
+    await face_finding()    # entering main loop of program
 
     transport.close()   # clean up serve endpoint
 
