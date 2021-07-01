@@ -257,12 +257,20 @@ async def face_finding():
                                         emotion_title = emotion_dict[emotion_caption][rand_index]
                                     emotion_dict[emotion_caption + "_prev"] = emotion_title
 
-                                    # send matt the title
+                                    title = emotion_title.split("#")[0]
+                                    hashtag = emotion_title.split("#")[1]
+
+                                    # send matt the title & hashtag
                                     msg = osc_message_builder.OscMessageBuilder(address="/title")
-                                    msg.add_arg(emotion_title)
-                                    print(emotion_title)
+                                    msg.add_arg(title)
                                     msg = msg.build()
                                     osc_client.send(msg)    
+
+                                    msg = osc_message_builder.OscMessageBuilder(address="/hashtag")
+                                    msg.add_arg("#" + hashtag)
+                                    msg = msg.build()
+                                    osc_client.send(msg)    
+
 
                                 capture_counter += 1
 
