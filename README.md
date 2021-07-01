@@ -1,4 +1,4 @@
-using python 3.7.5 64 bit to run<br>
+using python 3.6 64 bit to run<br>
 To install go [here](https://www.python.org/downloads/release/python-361/). Click on Windows x86-64 executable installer.<br>
 	* make sure to add python.exe to the path<br>
 	* do not remove any of the optional features during setup
