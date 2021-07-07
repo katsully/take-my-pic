@@ -1,16 +1,12 @@
 import cv2
-from keras.models import load_model
 import numpy as np
-import dlib
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
 from pythonosc.osc_server import AsyncIOOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 import asyncio
 from imutils import rotate_bound
-from utils.datasets import get_labels
 from utils.inference import apply_offsets
-from utils.preprocessor import preprocess_input
 from random import randint
 from time import time
 from PIL import Image
@@ -50,7 +46,7 @@ def take_photo(address, *args):
         else:
             y2 += remaining_y_space / 2
             y1 -= remaining_y_space / 2
-        crop_img = flipped[y1:y2, 0:img_w]
+        crop_img = flipped[int(y1):int(y2), 0:int(img_w)]
 
         pil_img = cv2.cvtColor(crop_img,cv2.COLOR_BGR2RGB)
         pilimg = Image.fromarray(pil_img)
@@ -85,12 +81,12 @@ def take_photo(address, *args):
         resized = cv2.resize(portrait_img, dim, interpolation = cv2.INTER_CUBIC)
         aspect_ratio_h, aspect_ratio_w = resized.shape[:2]
         # crop image to be square
-        new_height = aspect_ratio_w 
-        final_img = resized[0:int(new_height), 0:aspect_ratio_w]     
+        final_img = resized[0:aspect_ratio_w, 0:aspect_ratio_w]     
 
     cv2.imwrite("../faces/photo.png", final_img) 
     print("saved photo")
     moment_time = True
+
 
 dispatcher = Dispatcher()
 dispatcher.map("/photoAnimation", take_photo)
@@ -102,7 +98,6 @@ def moments_enabled(arg):
     osc_client.send(msg)
 
 async def face_finding():
-
     global cam
     global x1, x2, y1, y2
     global flipped
@@ -110,38 +105,25 @@ async def face_finding():
     global selfie
 
     face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
-    emotion_model_path = '../trained_models/emotion_models/fer2013_mini_XCEPTION.102-0.66.hdf5'
-    emotion_labels = get_labels('fer2013')
 
     # hyper-parameters for bounding boxes shape
     crop_offsets = (50, 70)
-    emotion_offsets = (20, 40)
-    emotion_classifier = load_model(emotion_model_path, compile=False)      # loading models
-    emotion_target_size = emotion_classifier.input_shape[1:3]       # getting input model shapes for inference
    
     capture_counter = 0     # keep track of capturing every third face
-    selfie_counter = 0      # keep track of when we do selfie vs 'normal' pic
+    selfie_counter = 1      # keep track of when we do selfie vs 'normal' pic
     tracking_faces = True   # whether we are tracking faces or letting the avatars do an animation (ie a 'moment')
 
     # counter for collecting the avg info about a person
-    avg_counter = 0
     face_counter = 0
-    emotion_text = []
     found_face = False
-    face_x = 0
-    face_y = 0
-    face_w = 0
-    face_h = 0
-    face_analyze = False
+    face_x = face_y = face_w = face_h = 0
+    photo_ready = False
 
     # captions
-    emotions = ["angry_disgust", "fear_sad", "happy_neutral", "surprise"]
-    emotion_dict = dict()
-    for emotion in emotions:
-        temp_file = open(emotion + ".txt", "r")
-        emotion_dict[emotion] = [line.rstrip() for line in temp_file.readlines()]
-        emotion_dict[emotion + "_prev"] = ""
-        temp_file.close()
+    temp_file = open("captions.txt", "r")
+    captions = [line.rstrip() for line in temp_file.readlines()]
+    temp_file.close()
+    caption_counter = 0
 
     if cam.isOpened(): # try to get the first frame
         ret, img = cam.read()   
@@ -172,15 +154,13 @@ async def face_finding():
             # minNeighbors (optional) is specifying how many neighbors each candidate rectangle show have, to retain it. A higher number gives lower false positives
             # minSize (optional) is the minimum rectangle size to be considered a face
             faces = face_detector.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=6)
-            
+
             # if no faces are detected
             if len(faces) == 0:
                 # reset 
                 found_face = False
-                face_analyze = False
+                photo_ready = False
                 face_counter = 0
-                avg_counter = 0
-                emotion_text.clear()
 
             # camera found one or more faces
             else:
@@ -194,94 +174,62 @@ async def face_finding():
                     if isinstance(faces, tuple):
                         found_face = False
                         face_counter = 0
-                        face_analyze = False
-                        emotion_text.clear()
+                        photo_ready = False
                     # face is still there
                     else:
                         # if we're still determining this face isn't someone quickly entering and exiting
-                        if not face_analyze:
+                        if not photo_ready:
                             face_counter += 1
                             # face isn't just coming and going
                             if face_counter > 5:
-                                face_analyze = True
+                                photo_ready = True
                         # we're ready to analyze this face!
-                        if face_analyze:
-                            x1,x2,y1,y2 = apply_offsets((face_x, face_y, face_w, face_h), emotion_offsets)
-                            gray_face_og = gray_img[y1:y2, x1:x2]
-                            try:
-                                gray_face = cv2.resize(gray_face_og, (emotion_target_size))
-                            except:
-                                continue
-                            # get emotion
-                            gray_face = preprocess_input(gray_face, False)
-                            gray_face = np.expand_dims(gray_face, 0)
-                            gray_face = np.expand_dims(gray_face, -1)
-                            emotion_label_arg = np.argmax(emotion_classifier.predict(gray_face))
-                            emotion_text.append(emotion_labels[emotion_label_arg])
-
-                            avg_counter += 1
-
-                            if avg_counter > 30:  
-                                if capture_counter % 3 == 0:  
-                                    # tell matt to take a photo
-                                    if selfie_counter % 3 == 0:
-                                        selfie = True
-                                        print("sending to matt to take selfie pic")
-                                        msg = osc_message_builder.OscMessageBuilder(address="/takeAPicSelfie")
-                                        msg.add_arg(0)
-                                        msg = msg.build()
-                                        osc_client.send(msg)
-                                    else:
-                                        print("sending to matt to take pic")
-                                        msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
-                                        msg.add_arg(0)
-                                        msg = msg.build()
-                                        osc_client.send(msg)
-                                    selfie_counter += 1
-
-                                    # stop searching for faces until matt takes photo
-                                    tracking_faces = False
-                                    
-                                    # sad, surprise, happy, angry, neutral, disgust, and fear
-                                    emotion_caption = max(set(emotion_text), key=emotion_text.count)
-
-                                    if emotion_caption == "sad" or emotion_caption == "fear":
-                                        emotion_caption = "fear_sad"
-                                    elif emotion_caption == "angry" or emotion_caption == "disgust":
-                                        emotion_caption = "angry_disgust"
-                                    elif emotion_caption == "happy" or emotion_caption == "neutral":
-                                        emotion_caption = "happy_neutral"
-
-                                    rand_index = randint(0,len(emotion_dict[emotion_caption])-1)
-                                    emotion_title = emotion_dict[emotion_caption][rand_index]
-                                    while emotion_title == emotion_dict[emotion_caption + "_prev"]:
-                                        rand_index = randint(0,len(emotion_dict[emotion_caption])-1)
-                                        emotion_title = emotion_dict[emotion_caption][rand_index]
-                                    emotion_dict[emotion_caption + "_prev"] = emotion_title
-
-                                    title = emotion_title.split("#")[0]
-                                    hashtag = emotion_title.split("#")[1]
-
-                                    # send matt the title & hashtag
-                                    msg = osc_message_builder.OscMessageBuilder(address="/title")
-                                    msg.add_arg(title)
+                        if photo_ready:
+                            if capture_counter % 3 == 0:  
+                                # tell matt to take a photo
+                                if selfie_counter % 5 == 0:
+                                    selfie = True
+                                    print("sending to matt to take selfie pic")
+                                    msg = osc_message_builder.OscMessageBuilder(address="/takeAPicSelfie")
+                                    msg.add_arg(0)
                                     msg = msg.build()
-                                    osc_client.send(msg)    
-
-                                    msg = osc_message_builder.OscMessageBuilder(address="/hashtag")
-                                    msg.add_arg("#" + hashtag)
+                                    osc_client.send(msg)
+                                else:
+                                    print("sending to matt to take pic")
+                                    msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
+                                    msg.add_arg(0)
                                     msg = msg.build()
-                                    osc_client.send(msg)    
+                                    osc_client.send(msg)
+                                selfie_counter += 1
 
+                                # stop searching for faces until matt takes photo
+                                tracking_faces = False
 
-                                capture_counter += 1
+                                caption = captions[caption_counter]
+                                caption_counter += 1
+                                if caption_counter >= len(captions):
+                                    caption_counter = 0
 
-                                # Reset everything
-                                avg_counter = 0
-                                emotion_text.clear()
-                                found_face = False
-                                face_analyze = False
-                                face_counter = 0
+                                title = caption.split("#")[0]
+                                hashtag = caption.split("#")[1]
+
+                                # send matt the title & hashtag
+                                msg = osc_message_builder.OscMessageBuilder(address="/title")
+                                msg.add_arg(title)
+                                msg = msg.build()
+                                osc_client.send(msg)    
+
+                                msg = osc_message_builder.OscMessageBuilder(address="/hashtag")
+                                msg.add_arg("#" + hashtag)
+                                msg = msg.build()
+                                osc_client.send(msg)    
+
+                            capture_counter += 1
+
+                            # Reset everything
+                            found_face = False
+                            photo_ready = False
+                            face_counter = 0
                         
                 # still looking for a face to focus on
                 else:   
@@ -296,7 +244,7 @@ async def face_finding():
                 break
         # time right after photo is taken, where the avatar will do an animation/moment
         elif moment_time:
-            t_end = time() + randint(60,90)
+            t_end = time() + 60
             while time() < t_end:
                 moments_enabled(1)
             moments_enabled(0)

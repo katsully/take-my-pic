@@ -1,1 +1,0 @@
-instapy -u thecollectorsgallery -p lookyloo -f %~f1 -t %2
