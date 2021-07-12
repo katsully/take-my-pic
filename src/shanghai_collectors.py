@@ -120,7 +120,7 @@ async def face_finding():
     photo_ready = False
 
     # captions
-    temp_file = open("captions.txt", "r")
+    temp_file = open("captions.txt", "r", encoding="utf8")
     captions = [line.rstrip() for line in temp_file.readlines()]
     temp_file.close()
     caption_counter = 0
