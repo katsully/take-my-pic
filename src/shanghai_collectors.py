@@ -60,10 +60,10 @@ def take_photo(address, *args):
 
     else:
         # convert image to 1:1 aspect ratio                     
-        x1 -= (x2-x1) * .25
-        x2 += (x2-x1) * .25
-        y1 -= (y2-y1) * .1
-        y2 += (y2-y1) * .4
+        x1 -= (x2-x1) * .3
+        x2 += (x2-x1) * .3
+        y1 -= (y2-y1) * .15
+        y2 += (y2-y1) * .45
         if x1 < 0:
             x1 = 0
         if x2 >= img_w:
@@ -191,15 +191,14 @@ async def face_finding():
                                     selfie = True
                                     print("sending to matt to take selfie pic")
                                     msg = osc_message_builder.OscMessageBuilder(address="/takeAPicSelfie")
-                                    msg.add_arg(0)
-                                    msg = msg.build()
-                                    osc_client.send(msg)
                                 else:
                                     print("sending to matt to take pic")
                                     msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
-                                    msg.add_arg(0)
-                                    msg = msg.build()
-                                    osc_client.send(msg)
+
+                                msg.add_arg(0)
+                                msg = msg.build()
+                                osc_client.send(msg)
+                                
                                 selfie_counter += 1
 
                                 # stop searching for faces until matt takes photo
@@ -238,7 +237,7 @@ async def face_finding():
                         found_face = True;
                         face_x, face_y, face_w, face_h = x,y,w,h
                         break
-            cv2.imshow("test window", flipped)
+            # cv2.imshow("test window", flipped)
             k = cv2.waitKey(30 & 0xff)
             if k == 27:
                 break
