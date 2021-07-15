@@ -222,17 +222,8 @@ async def face_finding():
             if k == 27:
                 break
         # time right after photo is taken, where the avatar will do an animation/moment
-<<<<<<< HEAD
-        elif moment_time:
-            t_end = time() + 87
-            while time() < t_end:
-                print("doing a moment")
-                moments_enabled(1)
-            print("MOMENTS OVER")
-            moments_enabled(0)
-            tracking_faces = True
-            moment_time = False
-=======
+        else:
+            moments_enabled(1)
         # elif moment_time:
         #     t_end = time() + 60
         #     while time() < t_end:
@@ -240,7 +231,6 @@ async def face_finding():
         #     moments_enabled(0)
         #     tracking_faces = True
         #     moment_time = False
->>>>>>> 71918c41f1c1956dc816b1417713313e07e3c5b5
 
     
 async def init_main():
