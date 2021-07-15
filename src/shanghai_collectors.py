@@ -19,7 +19,7 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
 
 x1 = x2 = y1 = y2 = 0
 flipped = {}
-moment_time = False
+tracking_faces = False
 selfie = False
 
 # build udp_client for osc protocol
@@ -60,10 +60,10 @@ def take_photo(address, *args):
 
     else:
         # convert image to 1:1 aspect ratio                     
-        x1 -= (x2-x1) * .25
-        x2 += (x2-x1) * .25
-        y1 -= (y2-y1) * .1
-        y2 += (y2-y1) * .4
+        x1 -= (x2-x1) * .3
+        x2 += (x2-x1) * .3
+        y1 -= (y2-y1) * .15
+        y2 += (y2-y1) * .45
         if x1 < 0:
             x1 = 0
         if x2 >= img_w:
@@ -85,11 +85,16 @@ def take_photo(address, *args):
 
     cv2.imwrite("../faces/photo.png", final_img) 
     print("saved photo")
-    moment_time = True
 
+
+def moment_done(address, *args):
+    global tracking_faces
+
+    tracking_faces = True
 
 dispatcher = Dispatcher()
 dispatcher.map("/photoAnimation", take_photo)
+dispatcher.map("/momentDone", moment_done)
 
 def moments_enabled(arg):
     msg = osc_message_builder.OscMessageBuilder(address="/isMomentsEnabled")
@@ -101,7 +106,7 @@ async def face_finding():
     global cam
     global x1, x2, y1, y2
     global flipped
-    global moment_time
+    global tracking_faces
     global selfie
 
     face_detector = cv2.CascadeClassifier('../trained_models/detection_models/haarcascade_frontalface_default.xml')
@@ -191,15 +196,14 @@ async def face_finding():
                                     selfie = True
                                     print("sending to matt to take selfie pic")
                                     msg = osc_message_builder.OscMessageBuilder(address="/takeAPicSelfie")
-                                    msg.add_arg(0)
-                                    msg = msg.build()
-                                    osc_client.send(msg)
                                 else:
                                     print("sending to matt to take pic")
                                     msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
-                                    msg.add_arg(0)
-                                    msg = msg.build()
-                                    osc_client.send(msg)
+
+                                msg.add_arg(0)
+                                msg = msg.build()
+                                osc_client.send(msg)
+                                
                                 selfie_counter += 1
 
                                 # stop searching for faces until matt takes photo
@@ -238,18 +242,18 @@ async def face_finding():
                         found_face = True;
                         face_x, face_y, face_w, face_h = x,y,w,h
                         break
-            cv2.imshow("test window", flipped)
+            # cv2.imshow("test window", flipped)
             k = cv2.waitKey(30 & 0xff)
             if k == 27:
                 break
         # time right after photo is taken, where the avatar will do an animation/moment
-        elif moment_time:
-            t_end = time() + 60
-            while time() < t_end:
-                moments_enabled(1)
-            moments_enabled(0)
-            tracking_faces = True
-            moment_time = False
+        # elif moment_time:
+        #     t_end = time() + 60
+        #     while time() < t_end:
+        #         moments_enabled(1)
+        #     moments_enabled(0)
+        #     tracking_faces = True
+        #     moment_time = False
 
     
 async def init_main():
