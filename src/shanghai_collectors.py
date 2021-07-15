@@ -51,7 +51,7 @@ def take_photo(address, *args):
         pil_img = cv2.cvtColor(crop_img,cv2.COLOR_BGR2RGB)
         pilimg = Image.fromarray(pil_img)
 
-        overlay = Image.open('CarliSelfie.png')
+        overlay = Image.open('selfieReggie.png')
 
         pilimg.paste(overlay, (0,0), mask = overlay)
 
