@@ -84,7 +84,7 @@ def take_photo(address, *args):
         final_img = resized[0:aspect_ratio_w, 0:aspect_ratio_w]     
 
     cv2.imwrite("../faces/photo.png", final_img) 
-    print("saved photo")
+    # print("saved photo")
 
 
 def moment_done(address, *args):
@@ -92,6 +92,8 @@ def moment_done(address, *args):
 
     tracking_faces = True
 
+
+# listener for matt
 dispatcher = Dispatcher()
 dispatcher.map("/photoAnimation", take_photo)
 dispatcher.map("/momentDone", moment_done)
@@ -188,10 +190,10 @@ async def face_finding():
                                 # tell matt to take a photo
                                 if selfie_counter % 5 == 0:
                                     selfie = True
-                                    print("sending to matt to take selfie pic")
+                                    # print("sending to matt to take selfie pic")
                                     msg = osc_message_builder.OscMessageBuilder(address="/takeAPicSelfie")
                                 else:
-                                    print("sending to matt to take pic")
+                                    # print("sending to matt to take pic")
                                     msg = osc_message_builder.OscMessageBuilder(address="/takeAPic")
 
                                 msg.add_arg(0)
@@ -224,13 +226,6 @@ async def face_finding():
         # time right after photo is taken, where the avatar will do an animation/moment
         else:
             moments_enabled(1)
-        # elif moment_time:
-        #     t_end = time() + 60
-        #     while time() < t_end:
-        #         moments_enabled(1)
-        #     moments_enabled(0)
-        #     tracking_faces = True
-        #     moment_time = False
 
     
 async def init_main():
