@@ -119,12 +119,6 @@ async def face_finding():
     face_x = face_y = face_w = face_h = 0
     photo_ready = False
 
-    # captions
-    temp_file = open("captions.txt", "r", encoding="utf8")
-    captions = [line.rstrip() for line in temp_file.readlines()]
-    temp_file.close()
-    caption_counter = 0
-
     if cam.isOpened(): # try to get the first frame
         ret, img = cam.read()   
     else:
@@ -204,25 +198,6 @@ async def face_finding():
                                 # stop searching for faces until matt takes photo
                                 tracking_faces = False
 
-                                caption = captions[caption_counter]
-                                caption_counter += 1
-                                if caption_counter >= len(captions):
-                                    caption_counter = 0
-
-                                title = caption.split("#")[0]
-                                hashtag = caption.split("#")[1]
-
-                                # send matt the title & hashtag
-                                msg = osc_message_builder.OscMessageBuilder(address="/title")
-                                msg.add_arg(title)
-                                msg = msg.build()
-                                osc_client.send(msg)    
-
-                                msg = osc_message_builder.OscMessageBuilder(address="/hashtag")
-                                msg.add_arg("#" + hashtag)
-                                msg = msg.build()
-                                osc_client.send(msg)    
-
                             capture_counter += 1
 
                             # Reset everything
@@ -243,9 +218,11 @@ async def face_finding():
                 break
         # time right after photo is taken, where the avatar will do an animation/moment
         elif moment_time:
-            t_end = time() + 60
+            t_end = time() + 87
             while time() < t_end:
+                print("doing a moment")
                 moments_enabled(1)
+            print("MOMENTS OVER")
             moments_enabled(0)
             tracking_faces = True
             moment_time = False
